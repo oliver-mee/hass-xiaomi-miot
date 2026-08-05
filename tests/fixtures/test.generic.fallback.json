@@ -106,7 +106,20 @@
           "out": []
         }
       ],
-      "events": []
+      "events": [
+        {
+          "iid": 1,
+          "type": "urn:miot-spec-v2:event:print-finished:00005001:test-fallback:1",
+          "description": "Print Finished",
+          "arguments": []
+        },
+        {
+          "iid": 2,
+          "type": "urn:miot-spec-v2:event:paper-jammed:00005002:test-fallback:1",
+          "description": "Paper Jammed",
+          "arguments": [3, 2]
+        }
+      ]
     }
   ]
 }

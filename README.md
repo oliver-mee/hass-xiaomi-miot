@@ -131,6 +131,7 @@ domain.your_entity_id:
   miio_properties: power,battery # Get miio properties to state attributes
   miio_cloud_props: prop.power,event.dev_online
   generic_entities: true  # Create entities for every remaining spec property and action
+  event_entities: true    # Create event entities for the device's spec events
 
 # Custom sub entities
 domain.parent_entity_id:

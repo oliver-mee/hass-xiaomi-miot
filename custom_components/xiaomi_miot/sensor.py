@@ -289,6 +289,7 @@ class MihomeMessageSensor(MiCoordinatorEntity, BaseEntity, RestoreEntity):
     _filter_homes = None
     _exclude_types = None
     _has_none_message = False
+    _dispatched_mid = 0
 
     def __init__(self, hass, cloud: MiotCloud):
         self.hass = hass
@@ -376,6 +377,28 @@ class MihomeMessageSensor(MiCoordinatorEntity, BaseEntity, RestoreEntity):
             'event_data': body.get('extra', body.get('value')),
         })
 
+    def dispatch_device_events(self, messages: list):
+        """Feed every unseen message to its device's event entities.
+
+        Kept separate from the state above because the two need different
+        pacing: the sensor deliberately advances one message per poll, while an
+        event entity must see all of them or occurrences are silently lost.
+        `_dispatched_mid` is the high-water mark that keeps them independent.
+        """
+        entry = getattr(self.cloud, 'hass_entry', None)
+        if not entry or not messages:
+            return
+        for msg in messages:
+            mid = msg.get('msg_id', 0)
+            if mid and mid <= self._dispatched_mid:
+                continue
+            try:
+                entry.dispatch_device_event(msg)
+            except Exception as exc:  # noqa: BLE001 - one bad message must not stop the rest
+                _LOGGER.warning('Dispatch xiaomi message as event failed: %s', exc)
+            if mid > self._dispatched_mid:
+                self._dispatched_mid = mid
+
     async def fetch_latest_message(self):
         res = await self.cloud.async_request_api('v2/message/v2/typelist', data={}) or {}
         mls = (res.get('result') or {}).get('messages') or []
@@ -383,6 +406,7 @@ class MihomeMessageSensor(MiCoordinatorEntity, BaseEntity, RestoreEntity):
         prev_time = self._attr_extra_state_attributes.get('ctime')
         prev_mid = self._attr_extra_state_attributes.get('msg_id')
         msg = {}
+        fresh = []
         for m in mls:
             hre = m.get('params', {}).get('body', {}).get('homeRoomExtra', {})
             home = hre.get('homeName')
@@ -399,8 +423,13 @@ class MihomeMessageSensor(MiCoordinatorEntity, BaseEntity, RestoreEntity):
                 continue
             m['homeName'] = home
             m['roomName'] = hre.get('roomName')
-            msg = m
-            break
+            fresh.append(m)
+            if not msg:
+                # State still tracks the oldest unseen message, one per poll, as
+                # it always has. Events below must not inherit that pacing —
+                # they need every message or occurrences get dropped.
+                msg = m
+        self.dispatch_device_events(fresh)
         if not mls:
             if not self._has_none_message:
                 # Only raise a warning if there was a failure obtaining the xiaomi message

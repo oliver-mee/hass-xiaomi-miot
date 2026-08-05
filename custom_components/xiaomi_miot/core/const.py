@@ -30,6 +30,7 @@ SUPPORTED_DOMAINS = [
     'button',
     'text',
     'time',
+    'event',
     'light',
     'fan',
     'climate',

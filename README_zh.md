@@ -156,6 +156,7 @@ domain.your_entity_id:
   miio_properties: power,battery # 获取miio属性到实体的属性中
   miio_cloud_props: prop.power,event.dev_online
   generic_entities: true  # 为规格中剩余的所有属性和动作创建实体
+  event_entities: true    # 为设备规格中的事件创建事件实体
 
 # 自定义子实体
 domain.parent_entity_id:
