@@ -3263,6 +3263,19 @@ DEVICE_CUSTOMIZES = {
         'select_properties': 'night_shot,recording_mode,detection_sensitivity',
         'switch_properties': 'on,time_watermark,motion_tracking,motion_detection,wdr_mode,glimmer_full_color',
         'number_properties': 'image_rollover,alarm_interval',
+        # The cloud message feed names camera detections differently from the
+        # spec, so event entities need the mapping spelled out. Keys are the
+        # `eventType` seen in a message's extraInfo; values are spec event names.
+        'cloud_events': {
+            'PeopleMotion': 'someone_appeared',
+            'PetMotion': 'pet_appeared',
+            'ObjectMotion': 'object_motion',
+            'BabyCry': 'detected_babycry_event',
+            'AbnormalSound': 'abnormal_sound',
+            'FireSmoke': 'fire_smoke_event',
+            'NoHumanAppear': 'no_human_appear',
+            'LongTimeNoHuman': 'long_time_no_human',
+        },
     },
     '*.cateye.*': {
         'auto_cloud': True,

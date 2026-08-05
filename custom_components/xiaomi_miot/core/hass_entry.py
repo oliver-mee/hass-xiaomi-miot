@@ -8,6 +8,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import SUPPORTED_DOMAINS
+from .utils import message_event_names
 from .xiaomi_cloud import REAUTH_SIDS, CloudSid, MiotCloud
 
 if TYPE_CHECKING:
@@ -115,21 +116,24 @@ class HassEntry:
         """Route one Mi Home message to its device as a MIoT event.
 
         The cloud message feed is the only event source available without the
-        push transport, so an event entity is fed from here rather than from
-        the property coordinator. Returns True if it matched an event converter.
+        push transport, so event entities are fed from here rather than from the
+        property coordinator. Returns True if it matched an event converter.
         """
         body = (msg.get('params') or {}).get('body') or {}
-        name = body.get('event')
-        if not name:
-            return False
         device = self.get_device_by_did(msg.get('did') or body.get('did'))
         if not device or not device.spec:
+            return False
+
+        names = message_event_names(body, device.custom_config('cloud_events'))
+        if not names:
             return False
 
         for service in device.spec.services.values():
             event = service.events.get(body.get('eiid')) if body.get('eiid') else None
             if not event:
-                event = service.get_event(name)
+                for name in names:
+                    if event := service.get_event(name):
+                        break
             if not event:
                 continue
             if not device.find_converter(f'event.{event.full_name}'):
