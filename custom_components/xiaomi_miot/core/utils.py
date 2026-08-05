@@ -163,6 +163,55 @@ def in_china(hass=None):
     return False
 
 
+def message_event_names(body: dict, aliases: dict = None):
+    """Candidate spec-event names for one Mi Home message body, best first.
+
+    The cloud message feed is a notification stream, not a MIoT event stream.
+    It reports its own event names and buries the specific detail in a
+    JSON-encoded `extraInfo` string nested inside the body's `extra`. A camera
+    motion message arrives as `smart_camera_motion` with
+    `eventType == 'PeopleMotion'`, while the spec calls the same occurrence
+    `someone_appeared` — there is no derivable path between those two, so an
+    alias map is the only honest way across.
+
+    Candidates are, in order: an explicit alias, the raw `eventType`, its
+    snake_case form, then the same for the message's own event name. The spec
+    decides which of them exists.
+    """
+    names = []
+    aliases = aliases or {}
+
+    def add(val):
+        if not val or not isinstance(val, str):
+            return
+        if mapped := aliases.get(val):
+            for m in ([mapped] if isinstance(mapped, str) else mapped):
+                if m not in names:
+                    names.append(m)
+        # 'PeopleMotion' -> 'people_motion'
+        snake = re.sub(r'(?<!^)(?=[A-Z])', '_', val).lower()
+        for candidate in (val, snake):
+            if candidate and candidate not in names:
+                names.append(candidate)
+
+    extra = body.get('extra')
+    if not isinstance(extra, dict):
+        extra = body.get('value')
+    if isinstance(extra, dict):
+        info = extra.get('extraInfo')
+        if isinstance(info, str):
+            try:
+                info = json.loads(info)
+            except (ValueError, TypeError):
+                info = None
+        if isinstance(info, dict):
+            add(info.get('eventType'))
+        add(extra.get('eventType'))
+
+    add(body.get('event'))
+    return names
+
+
 def wildcard_models(model):
     if not model:
         return []
