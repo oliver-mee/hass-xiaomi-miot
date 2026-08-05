@@ -9,8 +9,10 @@ from homeassistant.helpers.restore_state import ExtraStoredData, RestoredExtraDa
 
 from .const import DOMAIN
 from .utils import get_customize_via_entity, wildcard_models, CustomConfigHelper
-from .miot_spec import MiotService, MiotProperty, MiotAction
-from .converters import BaseConv, InfoConv, MiotServiceConv, MiotPropConv, MiotActionConv
+from .miot_spec import MiotService, MiotProperty, MiotAction, MiotEvent
+from .converters import (
+    BaseConv, InfoConv, MiotServiceConv, MiotPropConv, MiotActionConv, MiotEventConv,
+)
 from .xiaomi_cloud import CloudSid, MiotCloud
 
 if TYPE_CHECKING:
@@ -109,6 +111,7 @@ class XEntity(BasicEntity):
     _miot_service: Optional[MiotService] = None
     _miot_property: Optional[MiotProperty] = None
     _miot_action: Optional[MiotAction] = None
+    _miot_event: Optional[MiotEvent] = None
 
     def __init__(self, device: 'Device', conv: 'BaseConv'):
         self.device = device
@@ -147,6 +150,16 @@ class XEntity(BasicEntity):
             self._miot_service = conv.action.service
             self._miot_action = conv.action
             self._miot_property = conv.prop
+            self._attr_available = True
+
+        elif isinstance(conv, MiotEventConv):
+            self.entity_id = conv.event.generate_entity_id(self, conv.domain)
+            self._attr_name = str(conv.event.friendly_desc)
+            self._attr_translation_key = conv.event.friendly_name
+            self._miot_service = conv.event.service
+            self._miot_event = conv.event
+            # Events are pushed, never polled — there is nothing to read that
+            # would prove the device is reachable, so do not gate on it.
             self._attr_available = True
 
         else:
@@ -304,6 +317,10 @@ def convert_unique_id(conv: 'BaseConv'):
     action = getattr(conv, 'action', None)
     if isinstance(action, MiotAction):
         return action.unique_name
+
+    event = getattr(conv, 'event', None)
+    if isinstance(event, MiotEvent):
+        return event.unique_name
 
     prop = getattr(conv, 'prop', None)
     if isinstance(prop, MiotProperty):
