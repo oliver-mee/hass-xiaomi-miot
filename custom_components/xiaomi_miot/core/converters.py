@@ -4,7 +4,7 @@ from homeassistant.util import color, percentage
 
 if TYPE_CHECKING:
     from .device import Device
-    from .miot_spec import MiotService, MiotProperty, MiotAction
+    from .miot_spec import MiotService, MiotProperty, MiotAction, MiotEvent
 
 
 @dataclass
@@ -166,6 +166,38 @@ class MiotActionConv(BaseConv):
             'aiid': int(p),
             'in':   ins,
         }
+
+@dataclass
+class MiotEventConv(BaseConv):
+    event: 'MiotEvent' = None
+
+    def __post_init__(self):
+        super().__post_init__()
+        if not self.mi:
+            from .miot_spec import MiotSpec
+            self.mi = MiotSpec.unique_prop(self.event.siid, eiid=self.event.iid)
+
+    def decode(self, device: 'Device', payload: dict, value):
+        """Name the event's arguments so consumers get a dict, not a bare list.
+
+        A device sends event arguments positionally, in the order the spec
+        declares them. Zipping them against the argument properties turns
+        `[1, 30]` into `{'status': 1, 'duration': 30}`.
+        """
+        if isinstance(value, list) and self.event:
+            props = self.event.argument_properties()
+            named = {}
+            for prop, val in zip(props, value):
+                if isinstance(val, dict) and 'value' in val:
+                    val = val.get('value')
+                named[prop.name] = val
+            value = named or value
+        super().decode(device, payload, value)
+
+    def encode(self, device: 'Device', payload: dict, value):
+        """Events are inbound only — nothing to send to the device."""
+        return
+
 
 @dataclass
 class MiotServiceConv(MiotPropConv):

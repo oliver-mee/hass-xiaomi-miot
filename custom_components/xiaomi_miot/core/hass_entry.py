@@ -104,6 +104,44 @@ class HassEntry:
         await device.async_init()
         return device
 
+    def get_device_by_did(self, did):
+        if not did:
+            return None
+        if unique_id := self.did_to_unique.get(f'{did}'):
+            return self.devices.get(unique_id)
+        return None
+
+    def dispatch_device_event(self, msg: dict):
+        """Route one Mi Home message to its device as a MIoT event.
+
+        The cloud message feed is the only event source available without the
+        push transport, so an event entity is fed from here rather than from
+        the property coordinator. Returns True if it matched an event converter.
+        """
+        body = (msg.get('params') or {}).get('body') or {}
+        name = body.get('event')
+        if not name:
+            return False
+        device = self.get_device_by_did(msg.get('did') or body.get('did'))
+        if not device or not device.spec:
+            return False
+
+        for service in device.spec.services.values():
+            event = service.events.get(body.get('eiid')) if body.get('eiid') else None
+            if not event:
+                event = service.get_event(name)
+            if not event:
+                continue
+            if not device.find_converter(f'event.{event.full_name}'):
+                continue
+            device.dispatch(device.decode({
+                'siid': service.iid,
+                'eiid': event.iid,
+                'arguments': body.get('arguments', body.get('extra', body.get('value'))),
+            }))
+            return True
+        return False
+
     def new_adder(self, domain, adder: AddEntitiesCallback):
         self.adders[domain] = adder
         _LOGGER.info('New adder: %s', [domain, adder])

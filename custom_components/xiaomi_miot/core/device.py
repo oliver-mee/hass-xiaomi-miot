@@ -24,7 +24,7 @@ from .hass_entry import HassEntry
 from .hass_entity import XEntity, BasicEntity, convert_unique_id
 from .converters import (
     BaseConv, InfoConv, MiotPropConv,
-    MiotPropValueConv, MiotActionConv,
+    MiotPropValueConv, MiotActionConv, MiotEventConv,
     AttrConv, MiotTargetPositionConv, MiotTimePropConv,
 )
 from .coordinator import DataCoordinator
@@ -510,7 +510,27 @@ class Device(CustomConfigHelper):
             for attr in self.custom_config_list(f'{d}_attributes') or []:
                 self.add_converter(AttrConv(attr, d))
 
+        self.init_event_converters()
         self.init_generic_converters()
+
+    def init_event_converters(self):
+        """Expose every spec event as an `event` entity.
+
+        Opt-in per device via the `event_entities` customize. Events cost
+        nothing to carry — an `event` entity is inert until the device fires it
+        — but turning them on by default would add entities to every existing
+        install on upgrade, so the default stays off.
+        """
+        if not self.spec:
+            return
+        if not self.custom_config_bool('event_entities', False):
+            return
+
+        for service in self.spec.get_services(excludes=self._exclude_miot_services):
+            for event in service.events.values():
+                if self.find_converter(f'event.{event.full_name}'):
+                    continue
+                self.add_converter(MiotEventConv(event.full_name, 'event', event=event))
 
     def init_generic_converters(self):
         """Give every still-uncovered spec property and action an entity.
@@ -792,7 +812,13 @@ class Device(CustomConfigHelper):
             return
         siid = value.get('siid')
         piid = value.get('piid')
-        if siid and piid:
+        eiid = value.get('eiid')
+        if siid and eiid:
+            mi = MiotSpec.unique_prop(siid, eiid=eiid)
+            for conv in self.converters:
+                if conv.mi == mi:
+                    conv.decode(self, payload, value.get('arguments', value.get('value')))
+        elif siid and piid:
             mi = MiotSpec.unique_prop(siid, piid=piid)
             for conv in self.converters:
                 if conv.mi == mi:
