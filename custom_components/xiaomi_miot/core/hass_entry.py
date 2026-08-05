@@ -112,6 +112,21 @@ class HassEntry:
             return self.devices.get(unique_id)
         return None
 
+    @staticmethod
+    def dispatch_event_to_devices(msg: dict):
+        """Offer one Mi Home message to every entry until one owns the device.
+
+        Routing by device ownership rather than by whichever entry happens to
+        own the cloud session: a message names a did, and only one entry holds
+        that device. This also covers an account configured as several entries
+        (say one per region), where the entry that fetched the message is not
+        necessarily the one holding the device it describes.
+        """
+        for entry in list(HassEntry.ALL.values()):
+            if entry.dispatch_device_event(msg):
+                return True
+        return False
+
     def dispatch_device_event(self, msg: dict):
         """Route one Mi Home message to its device as a MIoT event.
 

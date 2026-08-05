@@ -384,20 +384,18 @@ class MihomeMessageSensor(MiCoordinatorEntity, BaseEntity, RestoreEntity):
         pacing: the sensor deliberately advances one message per poll, while an
         event entity must see all of them or occurrences are silently lost.
         `_dispatched_mid` is the high-water mark that keeps them independent.
+
+        Routed by device ownership rather than through this sensor's own cloud
+        session — see `HassEntry.dispatch_event_to_devices`.
         """
-        entry = getattr(self.cloud, 'hass_entry', None)
-        _LOGGER.debug(
-            'Event dispatch: %s fresh message(s), hass_entry=%s',
-            len(messages), type(entry).__name__ if entry else None,
-        )
-        if not entry or not messages:
+        if not messages:
             return
         for msg in messages:
             mid = msg.get('msg_id', 0)
             if mid and mid <= self._dispatched_mid:
                 continue
             try:
-                entry.dispatch_device_event(msg)
+                HassEntry.dispatch_event_to_devices(msg)
             except Exception as exc:  # noqa: BLE001 - one bad message must not stop the rest
                 _LOGGER.warning('Dispatch xiaomi message as event failed: %s', exc)
             if mid > self._dispatched_mid:
