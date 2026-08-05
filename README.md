@@ -130,6 +130,7 @@ domain.your_entity_id:
   check_lan: true         # Check LAN connection in cloud mode
   miio_properties: power,battery # Get miio properties to state attributes
   miio_cloud_props: prop.power,event.dev_online
+  generic_entities: true  # Create entities for every remaining spec property and action
 
 # Custom sub entities
 domain.parent_entity_id:

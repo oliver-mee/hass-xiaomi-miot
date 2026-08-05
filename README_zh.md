@@ -155,6 +155,7 @@ domain.your_entity_id:
   check_lan: true         # 云端模式下检查设备在局域网是否可用
   miio_properties: power,battery # 获取miio属性到实体的属性中
   miio_cloud_props: prop.power,event.dev_online
+  generic_entities: true  # 为规格中剩余的所有属性和动作创建实体
 
 # 自定义子实体
 domain.parent_entity_id:
