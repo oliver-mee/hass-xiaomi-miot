@@ -255,3 +255,61 @@ def test_camera_alias_map_ships_for_every_camera():
     aliases = DEVICE_CUSTOMIZES["*.camera.*"]["cloud_events"]
 
     assert aliases["PeopleMotion"] == "someone_appeared"
+
+
+def test_dispatch_routes_without_a_cloud_session(make_device, load_miot_spec):
+    """Regression: routing must not depend on which entry owns the cloud.
+
+    `HassEntry.get_cloud()` did not always pass `hass_entry=self` to
+    `MiotCloud.from_token`, so `cloud.hass_entry` could be None and every event
+    was silently dropped. Ownership of the *device* is what decides routing.
+    """
+    from custom_components.xiaomi_miot.core.hass_entry import HassEntry
+
+    device = make(make_device, load_miot_spec, event_entities=True)
+    entry = make_entry_with(device)
+    seen = []
+    device.add_listener(lambda data, only_info=False: seen.append(data))
+
+    original = dict(HassEntry.ALL)
+    HassEntry.ALL.clear()
+    HassEntry.ALL['test-entry'] = entry
+    try:
+        handled = HassEntry.dispatch_event_to_devices(REAL_CAMERA_MESSAGE)
+    finally:
+        HassEntry.ALL.clear()
+        HassEntry.ALL.update(original)
+
+    assert handled is False, 'no alias configured, so nothing should match'
+    assert seen == []
+
+
+def test_dispatch_to_devices_finds_the_owning_entry(make_device, load_miot_spec):
+    from custom_components.xiaomi_miot.core.hass_entry import HassEntry
+
+    other = make_device(
+        load_miot_spec("cnhdm.airrtc.wkq01.json"), model="cnhdm.airrtc.wkq01.other",
+    )
+    device = make_device(
+        load_miot_spec("test.generic.fallback.json"),
+        model="test.generic.fallback",
+        customizes={"event_entities": True, "cloud_events": {"PeopleMotion": "paper_jammed"}},
+    )
+    not_owning = make_entry_with(other)
+    not_owning.did_to_unique = {"someone-else": "unique"}
+    owning = make_entry_with(device)
+    seen = []
+    device.add_listener(lambda data, only_info=False: seen.append(data))
+
+    original = dict(HassEntry.ALL)
+    HassEntry.ALL.clear()
+    HassEntry.ALL['a'] = not_owning
+    HassEntry.ALL['b'] = owning
+    try:
+        handled = HassEntry.dispatch_event_to_devices(REAL_CAMERA_MESSAGE)
+    finally:
+        HassEntry.ALL.clear()
+        HassEntry.ALL.update(original)
+
+    assert handled is True
+    assert any("event.printer.paper_jammed" in d for d in seen)
