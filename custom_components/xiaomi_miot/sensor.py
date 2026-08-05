@@ -386,6 +386,10 @@ class MihomeMessageSensor(MiCoordinatorEntity, BaseEntity, RestoreEntity):
         `_dispatched_mid` is the high-water mark that keeps them independent.
         """
         entry = getattr(self.cloud, 'hass_entry', None)
+        _LOGGER.debug(
+            'Event dispatch: %s fresh message(s), hass_entry=%s',
+            len(messages), type(entry).__name__ if entry else None,
+        )
         if not entry or not messages:
             return
         for msg in messages:

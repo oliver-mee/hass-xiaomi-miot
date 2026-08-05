@@ -120,12 +120,18 @@ class HassEntry:
         property coordinator. Returns True if it matched an event converter.
         """
         body = (msg.get('params') or {}).get('body') or {}
-        device = self.get_device_by_did(msg.get('did') or body.get('did'))
+        did = msg.get('did') or body.get('did')
+        device = self.get_device_by_did(did)
         if not device or not device.spec:
+            _LOGGER.debug(
+                'Event dispatch: no device for did %s (known: %s)',
+                did, list(self.did_to_unique),
+            )
             return False
 
         names = message_event_names(body, device.custom_config('cloud_events'))
         if not names:
+            _LOGGER.debug('Event dispatch: no event names in body %s', body)
             return False
 
         for service in device.spec.services.values():
@@ -137,13 +143,20 @@ class HassEntry:
             if not event:
                 continue
             if not device.find_converter(f'event.{event.full_name}'):
+                _LOGGER.debug(
+                    'Event dispatch: %s matched but has no converter', event.full_name,
+                )
                 continue
             device.dispatch(device.decode({
                 'siid': service.iid,
                 'eiid': event.iid,
                 'arguments': body.get('arguments', body.get('extra', body.get('value'))),
             }))
+            _LOGGER.debug('Event dispatch: fired %s for did %s', event.full_name, did)
             return True
+        _LOGGER.debug(
+            'Event dispatch: no spec event matched %s for did %s', names, did,
+        )
         return False
 
     def new_adder(self, domain, adder: AddEntitiesCallback):
