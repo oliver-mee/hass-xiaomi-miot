@@ -169,8 +169,14 @@ class HassEntry:
             }))
             _LOGGER.debug('Event dispatch: fired %s for did %s', event.full_name, did)
             return True
-        _LOGGER.debug(
-            'Event dispatch: no spec event matched %s for did %s', names, did,
+        # INFO, not debug: an unmatched name is almost always a `cloud_events`
+        # alias that has not been written yet, and the message is the only
+        # place the real eventType is visible. Logging it turns the alias map
+        # into something a user can complete from their own log.
+        _LOGGER.info(
+            'Event dispatch: no spec event matched %s for %s (did %s). '
+            'Add the right one to the `cloud_events` customize.',
+            names, device.model, did,
         )
         return False
 

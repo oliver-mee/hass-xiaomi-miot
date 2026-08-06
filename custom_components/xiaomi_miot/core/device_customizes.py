@@ -3266,9 +3266,17 @@ DEVICE_CUSTOMIZES = {
         # The cloud message feed names camera detections differently from the
         # spec, so event entities need the mapping spelled out. Keys are the
         # `eventType` seen in a message's extraInfo; values are spec event names.
+        #
+        # The naming is not systematic — 'PeopleMotion' but plain 'Pet' — so
+        # every entry has to be observed rather than derived. Confirmed against
+        # a live chuangmi.camera.079ae2:
         'cloud_events': {
             'PeopleMotion': 'someone_appeared',
-            'PetMotion': 'pet_appeared',
+            'Pet': 'pet_appeared',
+            # Unconfirmed, inferred from the spec's event names. Harmless if
+            # wrong — the event simply does not fire. An unmatched eventType is
+            # logged at INFO by dispatch_device_event, so anything missing here
+            # can be read straight out of the log.
             'ObjectMotion': 'object_motion',
             'BabyCry': 'detected_babycry_event',
             'AbnormalSound': 'abnormal_sound',
