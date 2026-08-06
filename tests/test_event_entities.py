@@ -254,7 +254,11 @@ def test_camera_alias_map_ships_for_every_camera():
 
     aliases = DEVICE_CUSTOMIZES["*.camera.*"]["cloud_events"]
 
+    # Both confirmed against a live chuangmi.camera.079ae2. Note the naming is
+    # not systematic — 'PeopleMotion' but plain 'Pet' — so these cannot be
+    # derived, only observed.
     assert aliases["PeopleMotion"] == "someone_appeared"
+    assert aliases["Pet"] == "pet_appeared"
 
 
 def test_dispatch_routes_without_a_cloud_session(make_device, load_miot_spec):
@@ -313,3 +317,23 @@ def test_dispatch_to_devices_finds_the_owning_entry(make_device, load_miot_spec)
 
     assert handled is True
     assert any("event.printer.paper_jammed" in d for d in seen)
+
+
+def test_pet_message_shape_from_a_live_camera():
+    """Regression: the pet alias was guessed as 'PetMotion' and never fired.
+
+    Captured payload from the Living Room C701, 2026-08-06 08:11.
+    """
+    from custom_components.xiaomi_miot.core.utils import message_event_names
+    from custom_components.xiaomi_miot.core.device_customizes import DEVICE_CUSTOMIZES
+
+    body = {
+        "event": "smart_camera_motion",
+        "extra": {
+            "extraInfo": '{"ver":"1.0.0","alarmStart":true,"eventType":"Pet","channel":"0"}',
+            "isAlarm": True,
+        },
+    }
+    names = message_event_names(body, DEVICE_CUSTOMIZES["*.camera.*"]["cloud_events"])
+
+    assert names[0] == "pet_appeared"
