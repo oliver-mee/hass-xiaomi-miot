@@ -615,16 +615,18 @@ class Device(CustomConfigHelper):
         if not action.ins:
             return 'button'
         if len(action.ins) > 1:
-            # Multi-argument actions have no single-value UI control.
-            return None
+            # No single-value control fits several arguments, so send the
+            # parameters as a notify message instead of dropping the action.
+            return 'notify'
         prop = action.in_properties()[0] if action.in_properties() else None
         if not prop:
-            return None
+            return 'notify'
         if prop.value_list:
             return 'select'
         if prop.format in ['string']:
             return 'text'
-        return None
+        # A lone numeric or otherwise unconstrained argument: still reachable.
+        return 'notify'
 
     async def init_coordinators(self):
         if dby := self.hass_device_disabled:

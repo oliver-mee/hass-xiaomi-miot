@@ -70,8 +70,9 @@ def test_generic_entities_maps_actions_by_input_shape(make_device, load_miot_spe
     assert converters["printer.start_print"] == "button"
     assert converters["printer.print_text"] == "text"
     assert converters["printer.set_mode"] == "select"
-    # Multi-argument actions have no single-value control.
-    assert "printer.print_copies" not in converters
+    # No single-value control fits two arguments, so it goes out as notify
+    # rather than being dropped.
+    assert converters["printer.print_copies"] == "notify"
 
 
 def test_generic_entities_never_overrides_a_curated_converter(make_device, load_miot_spec):
@@ -140,3 +141,67 @@ def test_generic_entities_respects_excluded_properties(make_device, load_miot_sp
 
     assert "printer.custom_string" not in converters
     assert converters["printer.on"] == "switch"
+
+
+def test_notify_message_becomes_action_parameters():
+    """A MIoT action takes a positional list; commas are the natural syntax."""
+    from custom_components.xiaomi_miot.notify import NotifyEntity
+
+    assert NotifyEntity.parse_message("7, 1") == [7, 1]
+    assert NotifyEntity.parse_message("draft") == ["draft"]
+    assert NotifyEntity.parse_message("1.5,two,3") == [1.5, "two", 3]
+    assert NotifyEntity.parse_message(None) == []
+
+
+def test_notify_is_a_supported_domain():
+    from custom_components.xiaomi_miot.core.const import SUPPORTED_DOMAINS
+
+    assert "notify" in SUPPORTED_DOMAINS
+
+
+def enum_ready(device, attr):
+    """Build the SensorEntity metadata for one converter without a full HA setup."""
+    from homeassistant.components.sensor import SensorDeviceClass
+    from custom_components.xiaomi_miot.sensor import SensorEntity
+
+    conv = next(c for c in device.converters if c.attr == attr)
+    ent = SensorEntity.__new__(SensorEntity)
+    ent.conv = conv
+    ent._miot_property = conv.prop
+    ent._attr_icon = None
+    ent._attr_device_class = None
+    ent._attr_state_class = None
+    ent._attr_native_unit_of_measurement = None
+    ent._attr_options = None
+    ent.init_enum_options()
+    return ent, SensorDeviceClass
+
+
+def test_value_list_sensor_becomes_an_enum(make_device, load_miot_spec):
+    """`printer.mode` is a value-list property exposed as a sensor."""
+    device = make_device(
+        load_miot_spec("test.generic.fallback.json"),
+        model="test.generic.fallback.enum",
+        customizes={"generic_entities": True, "sensor_properties": "mode"},
+    )
+    ent, SensorDeviceClass = enum_ready(device, "printer.mode")
+
+    assert ent._attr_device_class == SensorDeviceClass.ENUM
+    # Lowercase, because MiotPropConv lowercases sensor values and HA rejects a
+    # state that is not in options.
+    assert ent._attr_options == ["draft", "photo"]
+    # An enum sensor may carry neither of these.
+    assert ent._attr_state_class is None
+    assert ent._attr_native_unit_of_measurement is None
+
+
+def test_non_enum_sensor_is_untouched(make_device, load_miot_spec):
+    device = make_device(
+        load_miot_spec("test.generic.fallback.json"),
+        model="test.generic.fallback.enum2",
+        customizes={"generic_entities": True},
+    )
+    ent, _ = enum_ready(device, "printer.custom_count")
+
+    assert ent._attr_options is None
+    assert ent._attr_device_class is None
