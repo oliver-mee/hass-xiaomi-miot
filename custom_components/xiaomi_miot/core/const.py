@@ -31,6 +31,7 @@ SUPPORTED_DOMAINS = [
     'text',
     'time',
     'event',
+    'notify',
     'light',
     'fan',
     'climate',
