@@ -157,6 +157,7 @@ domain.your_entity_id:
   miio_cloud_props: prop.power,event.dev_online
   generic_entities: true  # 为规格中剩余的所有属性和动作创建实体
   event_entities: true    # 为设备规格中的事件创建事件实体
+  lan_events: true        # 通过局域网接收设备推送的事件和属性变化 (需要 token)
 
 # 自定义子实体
 domain.parent_entity_id:
