@@ -216,6 +216,13 @@ class Device(CustomConfigHelper):
         self._exclude_miot_properties = self.custom_config_list('exclude_miot_properties', [])
         self._unreadable_properties = self.custom_config_bool('unreadable_properties')
 
+        if self.custom_config_bool('lan_events', False):
+            # Deliberately independent of conn_mode: properties can keep coming
+            # over the cloud while events arrive by push. Event transport and
+            # property transport are separate concerns.
+            from .miot_lan import MiotLanListener
+            await MiotLanListener.get(self.hass).async_add_device(self)
+
         if not self.coordinators:
             await self.init_coordinators()
 
@@ -223,6 +230,10 @@ class Device(CustomConfigHelper):
             self._unsub_purge = async_track_time_interval(self.hass, self.async_purge_entities, timedelta(hours=12))
 
     async def async_unload(self):
+        if self.custom_config_bool('lan_events', False):
+            from .miot_lan import MiotLanListener
+            MiotLanListener.get(self.hass).async_remove_device(self.info.did)
+
         for coo in self.coordinators:
             await coo.async_shutdown()
 

@@ -5,7 +5,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.const import CONF_USERNAME
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from .const import SUPPORTED_DOMAINS
+from .const import DOMAIN, SUPPORTED_DOMAINS
 from .utils import message_event_names
 from .xiaomi_cloud import MiotCloud
 
@@ -122,6 +122,14 @@ class HassEntry:
                 return True
         return False
 
+    @staticmethod
+    def lan_subscribed(device) -> bool:
+        listener = device.hass.data.get(DOMAIN, {}).get('lan_listener')
+        if not listener:
+            return False
+        lan = listener.devices.get(device.info.did)
+        return bool(lan and lan.subscribed)
+
     def dispatch_device_event(self, msg: dict):
         """Route one Mi Home message to its device as a MIoT event.
 
@@ -137,6 +145,15 @@ class HassEntry:
                 'Event dispatch: no device for did %s (known: %s)',
                 did, list(self.did_to_unique),
             )
+            return False
+
+        if self.lan_subscribed(device):
+            # LAN carries every occurrence and arrives first; the cloud feed is
+            # a throttled sample of the same events. Taking both would fire
+            # twice for anything that appears in each.
+            _LOGGER.debug(
+                'Event dispatch: %s is subscribed on lan, ignoring cloud message',
+                device.name_model)
             return False
 
         names = message_event_names(body, device.custom_config('cloud_events'))

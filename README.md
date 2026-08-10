@@ -130,6 +130,7 @@ domain.your_entity_id:
   miio_cloud_props: prop.power,event.dev_online
   generic_entities: true  # Create entities for every remaining spec property and action
   event_entities: true    # Create event entities for the device's spec events
+  lan_events: true        # Receive events/properties pushed over the LAN (needs a token)
 
 # Custom sub entities
 domain.parent_entity_id:
