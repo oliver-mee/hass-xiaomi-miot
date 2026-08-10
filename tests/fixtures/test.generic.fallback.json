@@ -1,0 +1,125 @@
+{
+  "type": "urn:miot-spec-v2:device:printer:0000A00F:test-fallback:1",
+  "description": "Generic Fallback Test Device",
+  "services": [
+    {
+      "iid": 2,
+      "type": "urn:miot-spec-v2:service:printer:00007895:test-fallback:1",
+      "description": "Printer",
+      "properties": [
+        {
+          "iid": 1,
+          "type": "urn:miot-spec-v2:property:on:00000006:test-fallback:1",
+          "description": "Switch Status",
+          "format": "bool",
+          "access": ["read", "write", "notify"]
+        },
+        {
+          "iid": 2,
+          "type": "urn:miot-spec-v2:property:mode:00000008:test-fallback:1",
+          "description": "Mode",
+          "format": "uint8",
+          "access": ["read", "write"],
+          "value-list": [
+            {"value": 0, "description": "Draft"},
+            {"value": 1, "description": "Photo"}
+          ]
+        },
+        {
+          "iid": 3,
+          "type": "urn:miot-spec-v2:property:brightness:0000000D:test-fallback:1",
+          "description": "Copies",
+          "format": "uint8",
+          "access": ["read", "write"],
+          "value-range": [1, 20, 1]
+        },
+        {
+          "iid": 4,
+          "type": "urn:miot-spec-v2:property:custom-string:00000100:test-fallback:1",
+          "description": "Job Name",
+          "format": "string",
+          "access": ["read", "write"]
+        },
+        {
+          "iid": 5,
+          "type": "urn:miot-spec-v2:property:status:00000007:test-fallback:1",
+          "description": "Paper Jam",
+          "format": "bool",
+          "access": ["read", "notify"]
+        },
+        {
+          "iid": 6,
+          "type": "urn:miot-spec-v2:property:custom-count:00000101:test-fallback:1",
+          "description": "Pages Printed",
+          "format": "uint32",
+          "access": ["read", "notify"]
+        },
+        {
+          "iid": 7,
+          "type": "urn:miot-spec-v2:property:custom-blob:00000102:test-fallback:1",
+          "description": "Opaque Blob",
+          "format": "uint32",
+          "access": ["write"]
+        },
+        {
+          "iid": 8,
+          "type": "urn:miot-spec-v2:property:custom-notify:00000103:test-fallback:1",
+          "description": "Notify Only",
+          "format": "uint8",
+          "access": ["notify"]
+        },
+        {
+          "iid": 9,
+          "type": "urn:miot-spec-v2:property:custom-jammed:00000104:test-fallback:1",
+          "description": "Paper Jam",
+          "format": "bool",
+          "access": ["read", "notify"]
+        }
+      ],
+      "actions": [
+        {
+          "iid": 1,
+          "type": "urn:miot-spec-v2:action:start-print:00002805:test-fallback:1",
+          "description": "Start Print",
+          "in": [],
+          "out": []
+        },
+        {
+          "iid": 2,
+          "type": "urn:miot-spec-v2:action:print-text:00002806:test-fallback:1",
+          "description": "Print Text",
+          "in": [4],
+          "out": []
+        },
+        {
+          "iid": 3,
+          "type": "urn:miot-spec-v2:action:set-mode:00002807:test-fallback:1",
+          "description": "Set Mode",
+          "in": [2],
+          "out": []
+        },
+        {
+          "iid": 4,
+          "type": "urn:miot-spec-v2:action:print-copies:00002808:test-fallback:1",
+          "description": "Print Copies",
+          "in": [4, 3],
+          "out": []
+        }
+      ],
+      "events": [
+        {
+          "iid": 1,
+          "type": "urn:miot-spec-v2:event:print-finished:00005001:test-fallback:1",
+          "description": "Print Finished",
+          "arguments": []
+        },
+        {
+          "iid": 2,
+          "type": "urn:miot-spec-v2:event:paper-jammed:00005002:test-fallback:1",
+          "description": "Paper Jammed",
+          "arguments": [3, 2]
+        }
+      ]
+    }
+  ]
+}

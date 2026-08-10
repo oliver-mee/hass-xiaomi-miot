@@ -24,11 +24,11 @@ from .hass_entry import HassEntry
 from .hass_entity import XEntity, BasicEntity, convert_unique_id
 from .converters import (
     BaseConv, InfoConv, MiotPropConv,
-    MiotPropValueConv, MiotActionConv,
+    MiotPropValueConv, MiotActionConv, MiotEventConv,
     AttrConv, MiotTargetPositionConv,
 )
 from .coordinator import DataCoordinator
-from .miot_spec import MiotSpec, MiotProperty, MiotResults, MiotResult
+from .miot_spec import MiotSpec, MiotProperty, MiotAction, MiotResults, MiotResult
 from .miio2miot import Miio2MiotHelper
 from .mini_miio import AsyncMiIO
 from .xiaomi_cloud import MiotCloud, MiCloudException
@@ -503,6 +503,122 @@ class Device(CustomConfigHelper):
             for attr in self.custom_config_list(f'{d}_attributes') or []:
                 self.add_converter(AttrConv(attr, d))
 
+        self.init_event_converters()
+        self.init_generic_converters()
+
+    def init_event_converters(self):
+        """Expose every spec event as an `event` entity.
+
+        Opt-in per device via the `event_entities` customize. Events cost
+        nothing to carry — an `event` entity is inert until the device fires it
+        — but turning them on by default would add entities to every existing
+        install on upgrade, so the default stays off.
+        """
+        if not self.spec:
+            return
+        if not self.custom_config_bool('event_entities', False):
+            return
+
+        for service in self.spec.get_services(excludes=self._exclude_miot_services):
+            for event in service.events.values():
+                if self.find_converter(f'event.{event.full_name}'):
+                    continue
+                self.add_converter(MiotEventConv(event.full_name, 'event', event=event))
+
+    def init_generic_converters(self):
+        """Give every still-uncovered spec property and action an entity.
+
+        The converters registered above are allowlist driven: a property is only
+        exposed if its service appears in GLOBAL_CONVERTERS or the model has a
+        matching `{domain}_properties` entry in DEVICE_CUSTOMIZES. Anything else
+        is parsed from the spec and then dropped, which is why an unsupported
+        model can end up with no entities at all.
+
+        This pass is the fallback. It never overrides an existing converter, so
+        the curated mappings keep their richer domains (light/fan/climate/...)
+        and this only fills the gaps.
+
+        Opt-in per device via the `generic_entities` customize, because a full
+        spec is noisy — plenty of models expose dozens of debug properties that
+        most users do not want as entities.
+        """
+        if not self.spec:
+            return
+        if not self.custom_config_bool('generic_entities'):
+            return
+
+        covered = set()
+        for conv in self.converters:
+            if conv.attr:
+                covered.add(conv.attr)
+            covered.update(conv.attrs or [])
+            if prop := getattr(conv, 'prop', None):
+                covered.add(prop.unique_prop)
+            if action := getattr(conv, 'action', None):
+                covered.add(action.unique_prop)
+
+        added = 0
+        for service in self.spec.get_services(excludes=self._exclude_miot_services):
+            for prop in service.properties.values():
+                if prop.unique_prop in covered or prop.full_name in covered:
+                    continue
+                if self._exclude_miot_properties and prop.in_list(self._exclude_miot_properties):
+                    continue
+                if not (domain := self.generic_domain_for_property(prop)):
+                    continue
+                self.add_converter_by_property(prop, domain=domain)
+                added += 1
+
+            for action in service.actions.values():
+                if action.unique_prop in covered or action.full_name in covered:
+                    continue
+                if not (domain := self.generic_domain_for_action(action)):
+                    continue
+                self.add_converter(MiotActionConv(action.full_name, domain, action=action))
+                added += 1
+
+        if added:
+            self.log.info('Added %s generic entities from spec.', added)
+
+    @staticmethod
+    def generic_domain_for_property(prop: MiotProperty):
+        """Pick a platform for a property using only its spec shape."""
+        if prop.writeable:
+            # Checked before `format` so a writable enum becomes a picker
+            # rather than a free-text field.
+            if prop.value_list:
+                return 'select'
+            if prop.value_range:
+                return 'number'
+            if prop.is_bool:
+                return 'switch'
+            if prop.format in ['string']:
+                return 'text'
+            # Writable but unconstrained and non-textual: no sensible control.
+            return None
+        if prop.readable:
+            return 'binary_sensor' if prop.is_bool else 'sensor'
+        # Neither readable nor writable — notify-only properties arrive through
+        # their service converter, not as an entity of their own.
+        return None
+
+    @staticmethod
+    def generic_domain_for_action(action: MiotAction):
+        """Pick a platform for an action using only its spec shape."""
+        if not action.ins:
+            return 'button'
+        if len(action.ins) > 1:
+            # Multi-argument actions have no single-value UI control.
+            return None
+        prop = action.in_properties()[0] if action.in_properties() else None
+        if not prop:
+            return None
+        if prop.value_list:
+            return 'select'
+        if prop.format in ['string']:
+            return 'text'
+        return None
+
     async def init_coordinators(self):
         if dby := self.hass_device_disabled:
             self.log.debug('Device disabled by: %s', dby)
@@ -689,7 +805,13 @@ class Device(CustomConfigHelper):
             return
         siid = value.get('siid')
         piid = value.get('piid')
-        if siid and piid:
+        eiid = value.get('eiid')
+        if siid and eiid:
+            mi = MiotSpec.unique_prop(siid, eiid=eiid)
+            for conv in self.converters:
+                if conv.mi == mi:
+                    conv.decode(self, payload, value.get('arguments', value.get('value')))
+        elif siid and piid:
             mi = MiotSpec.unique_prop(siid, piid=piid)
             for conv in self.converters:
                 if conv.mi == mi:

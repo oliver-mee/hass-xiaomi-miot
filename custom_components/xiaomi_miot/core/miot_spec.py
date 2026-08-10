@@ -179,6 +179,7 @@ class MiotSpec(MiotSpecInstance):
                 self.services[srv.iid].extend_specs(
                     properties=s.get('properties') or [],
                     actions=s.get('actions') or [],
+                    events=s.get('events') or [],
                 )
             elif srv.name:
                 self.services[srv.iid] = srv
@@ -270,10 +271,10 @@ class MiotSpec(MiotSpecInstance):
             domain = DOMAIN
         return f'{domain}.{eid}'
 
-    def get_spec_translation(self, siid, piid=None, aiid=None, viid=None):
+    def get_spec_translation(self, siid, piid=None, aiid=None, viid=None, eiid=None):
         if viid != None and not self.trans_options:
             return None
-        key = MiotSpec.spec_lang_key(siid, piid=piid, aiid=aiid, viid=viid)
+        key = MiotSpec.spec_lang_key(siid, piid=piid, aiid=aiid, viid=viid, eiid=eiid)
         langs = get_translation_langs(self.hass, list(self.spec_translations.keys()))
         for lang in langs:
             dic = self.spec_translations.get(lang) or {}
@@ -406,10 +407,12 @@ class MiotSpec(MiotSpecInstance):
         return f'{typ}.{siid}.{iid}'
 
     @staticmethod
-    def spec_lang_key(siid, piid=None, aiid=None, viid=None):
+    def spec_lang_key(siid, piid=None, aiid=None, viid=None, eiid=None):
         key = f'service:{siid:03}'
         if aiid != None:
             return f'{key}:action:{aiid:03}'
+        if eiid != None:
+            return f'{key}:event:{eiid:03}'
         if piid != None:
             key = f'{key}:property:{piid:03}'
         if viid != None:
@@ -496,7 +499,12 @@ class MiotService(MiotSpecInstance):
         spec.services_count[self.name] += 1
         self.properties = {}
         self.actions = {}
-        self.extend_specs(properties=dat.get('properties') or [], actions=dat.get('actions') or [])
+        self.events = {}
+        self.extend_specs(
+            properties=dat.get('properties') or [],
+            actions=dat.get('actions') or [],
+            events=dat.get('events') or [],
+        )
 
     def in_list(self, lst):
         pattern = convert_globs_to_pattern(lst)
@@ -513,7 +521,7 @@ class MiotService(MiotSpecInstance):
                 return True
         return False
 
-    def extend_specs(self, properties: list, actions: list):
+    def extend_specs(self, properties: list, actions: list, events: list = None):
         for p in properties:
             iid = int(p.get('iid') or 0)
             if old := self.properties.get(iid):
@@ -533,6 +541,15 @@ class MiotService(MiotSpecInstance):
                 continue
             self.actions[act.iid] = act
             self.spec.specs[act.unique_prop] = act
+        for e in events or []:
+            iid = int(e.get('iid') or 0)
+            if old := self.events.get(iid):
+                e = {**old.raw, **e}
+            evt = MiotEvent(e, self)
+            if not evt.name:
+                continue
+            self.events[evt.iid] = evt
+            self.spec.specs[evt.unique_prop] = evt
 
     @property
     def name_count(self):
@@ -607,6 +624,19 @@ class MiotService(MiotSpecInstance):
                 return a
         return None
 
+    def get_events(self, *args):
+        return [
+            e
+            for e in self.events.values()
+            if e.in_list(args) or not args
+        ]
+
+    def get_event(self, *args):
+        for e in self.events.values():
+            if e.in_list(args):
+                return e
+        return None
+
     def search_action(self, *args, **kwargs):
         for v in self.actions.values():
             dls = [
@@ -627,8 +657,8 @@ class MiotService(MiotSpecInstance):
     def generate_entity_id(self, entity, domain=None):
         return self.spec.generate_entity_id(entity, self.desc_name, domain)
 
-    def get_spec_translation(self, piid=None, aiid=None, viid=None):
-        return self.spec.get_spec_translation(self.iid, piid=piid, aiid=aiid, viid=viid)
+    def get_spec_translation(self, piid=None, aiid=None, viid=None, eiid=None):
+        return self.spec.get_spec_translation(self.iid, piid=piid, aiid=aiid, viid=viid, eiid=eiid)
 
     @property
     def translation_keys(self):
@@ -1158,6 +1188,62 @@ class MiotAction(MiotSpecInstance):
 
     def get_spec_translation(self, viid=None):
         return self.service.get_spec_translation(aiid=self.iid)
+
+    @property
+    def translation_keys(self):
+        return [
+            '_globals',
+            self.service.name,
+        ]
+
+
+class MiotEvent(MiotSpecInstance):
+    """A MIoT-Spec-V2 event.
+
+    Events are pushed by the device rather than read from it, so unlike a
+    property there is no value to poll. `arguments` lists the piids the device
+    sends with the event; they are resolved against the service's properties.
+    """
+
+    def __init__(self, dat: dict, service: MiotService):
+        self.service = service
+        self.siid = service.iid
+        super().__init__(dat)
+        self.unique_name = f'{service.unique_name}.{self.name}-{self.iid}'
+        self.unique_prop = self.service.unique_prop(eiid=self.iid)
+        self.full_name = f'{service.name}.{self.name}'
+        self.friendly_name = f'{service.name}.{self.name}'
+        self.friendly_desc = self.get_translation(self.description or self.name)
+        self.arguments = dat.get('arguments') or []
+
+    def in_list(self, lst):
+        pattern = convert_globs_to_pattern(lst)
+        if not pattern:
+            return False
+        names = [
+            self.name,
+            self.friendly_name,
+            self.full_name,
+            self.unique_name,
+            self.unique_prop,
+        ]
+        for name in names:
+            if pattern.match(name):
+                return True
+        return False
+
+    def argument_properties(self):
+        return [
+            prop
+            for pid in self.arguments
+            if (prop := self.service.properties.get(pid))
+        ]
+
+    def generate_entity_id(self, entity, domain=None):
+        return self.service.spec.generate_entity_id(entity, self.name, domain)
+
+    def get_spec_translation(self, viid=None):
+        return self.service.get_spec_translation(eiid=self.iid)
 
     @property
     def translation_keys(self):
