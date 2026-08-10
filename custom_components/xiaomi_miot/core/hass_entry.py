@@ -6,6 +6,7 @@ from homeassistant.const import CONF_USERNAME
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import SUPPORTED_DOMAINS
+from .utils import message_event_names
 from .xiaomi_cloud import MiotCloud
 
 if TYPE_CHECKING:
@@ -106,35 +107,72 @@ class HassEntry:
             return self.devices.get(unique_id)
         return None
 
+    @staticmethod
+    def dispatch_event_to_devices(msg: dict):
+        """Offer one Mi Home message to every entry until one owns the device.
+
+        Routing by device ownership rather than by whichever entry happens to
+        own the cloud session: a message names a did, and only one entry holds
+        that device. This also covers an account configured as several entries
+        (say one per region), where the entry that fetched the message is not
+        necessarily the one holding the device it describes.
+        """
+        for entry in list(HassEntry.ALL.values()):
+            if entry.dispatch_device_event(msg):
+                return True
+        return False
+
     def dispatch_device_event(self, msg: dict):
         """Route one Mi Home message to its device as a MIoT event.
 
         The cloud message feed is the only event source available without the
-        push transport, so an event entity is fed from here rather than from
-        the property coordinator. Returns True if it matched an event converter.
+        push transport, so event entities are fed from here rather than from the
+        property coordinator. Returns True if it matched an event converter.
         """
         body = (msg.get('params') or {}).get('body') or {}
-        name = body.get('event')
-        if not name:
-            return False
-        device = self.get_device_by_did(msg.get('did') or body.get('did'))
+        did = msg.get('did') or body.get('did')
+        device = self.get_device_by_did(did)
         if not device or not device.spec:
+            _LOGGER.debug(
+                'Event dispatch: no device for did %s (known: %s)',
+                did, list(self.did_to_unique),
+            )
+            return False
+
+        names = message_event_names(body, device.custom_config('cloud_events'))
+        if not names:
+            _LOGGER.debug('Event dispatch: no event names in body %s', body)
             return False
 
         for service in device.spec.services.values():
             event = service.events.get(body.get('eiid')) if body.get('eiid') else None
             if not event:
-                event = service.get_event(name)
+                for name in names:
+                    if event := service.get_event(name):
+                        break
             if not event:
                 continue
             if not device.find_converter(f'event.{event.full_name}'):
+                _LOGGER.debug(
+                    'Event dispatch: %s matched but has no converter', event.full_name,
+                )
                 continue
             device.dispatch(device.decode({
                 'siid': service.iid,
                 'eiid': event.iid,
                 'arguments': body.get('arguments', body.get('extra', body.get('value'))),
             }))
+            _LOGGER.debug('Event dispatch: fired %s for did %s', event.full_name, did)
             return True
+        # INFO, not debug: an unmatched name is almost always a `cloud_events`
+        # alias that has not been written yet, and the message is the only
+        # place the real eventType is visible. Logging it turns the alias map
+        # into something a user can complete from their own log.
+        _LOGGER.info(
+            'Event dispatch: no spec event matched %s for %s (did %s). '
+            'Add the right one to the `cloud_events` customize.',
+            names, device.model, did,
+        )
         return False
 
     def new_adder(self, domain, adder: AddEntitiesCallback):

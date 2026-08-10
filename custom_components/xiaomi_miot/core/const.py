@@ -28,6 +28,7 @@ SUPPORTED_DOMAINS = [
     'button',
     'text',
     'event',
+    'notify',
     'light',
     'fan',
     'climate',

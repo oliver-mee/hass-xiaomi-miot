@@ -126,6 +126,35 @@ class SensorEntity(XEntity, BaseEntity, RestoreEntity):
                 self._attr_state_class = self._miot_property.state_class
             if not self._attr_native_unit_of_measurement:
                 self._attr_native_unit_of_measurement = self._miot_property.unit_of_measurement
+            self.init_enum_options()
+
+    def init_enum_options(self):
+        """Declare a value-list property as an enum sensor.
+
+        Without this the state is a bare string with no metadata, so the UI
+        cannot translate it and long-term statistics treat it as unusable.
+
+        Options must be lowercase: `MiotPropConv.decode` lowercases sensor
+        values (`core/converters.py`), and Home Assistant rejects a state that
+        is not in `options`.
+        """
+        prop = self._miot_property
+        if not prop or not prop.value_list:
+            return
+        if not prop.use_desc(self.conv.domain):
+            return
+        if self._attr_device_class and self._attr_device_class != SensorDeviceClass.ENUM:
+            # A curated device_class knows better than the spec's shape.
+            return
+        options = prop.list_descriptions(lower=True)
+        if not isinstance(options, list) or not options:
+            return
+        self._attr_options = options
+        self._attr_device_class = SensorDeviceClass.ENUM
+        # Home Assistant rejects an enum sensor that also carries either of
+        # these, and neither means anything for a categorical value.
+        self._attr_state_class = None
+        self._attr_native_unit_of_measurement = None
 
     def get_state(self) -> dict:
         return {self.attr: self._attr_native_value}
@@ -384,16 +413,18 @@ class MihomeMessageSensor(MiCoordinatorEntity, BaseEntity, RestoreEntity):
         pacing: the sensor deliberately advances one message per poll, while an
         event entity must see all of them or occurrences are silently lost.
         `_dispatched_mid` is the high-water mark that keeps them independent.
+
+        Routed by device ownership rather than through this sensor's own cloud
+        session — see `HassEntry.dispatch_event_to_devices`.
         """
-        entry = getattr(self.cloud, 'hass_entry', None)
-        if not entry or not messages:
+        if not messages:
             return
         for msg in messages:
             mid = msg.get('msg_id', 0)
             if mid and mid <= self._dispatched_mid:
                 continue
             try:
-                entry.dispatch_device_event(msg)
+                HassEntry.dispatch_event_to_devices(msg)
             except Exception as exc:  # noqa: BLE001 - one bad message must not stop the rest
                 _LOGGER.warning('Dispatch xiaomi message as event failed: %s', exc)
             if mid > self._dispatched_mid:

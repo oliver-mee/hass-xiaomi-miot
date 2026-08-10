@@ -179,3 +179,161 @@ def test_dispatch_ignores_events_with_no_entity(make_device, load_miot_spec):
         "did": "test-device",
         "params": {"body": {"event": "paper_jammed"}},
     }) is False
+
+
+REAL_CAMERA_MESSAGE = {
+    "did": "test-device",
+    "params": {
+        "body": {
+            "event": "smart_camera_motion",
+            "extra": {
+                "extraInfo": '{"ver":"1.0.0","alarmStart":true,"eventType":"PeopleMotion","channel":"0"}',
+                "isAlarm": True,
+            },
+        },
+    },
+}
+
+
+def test_message_event_names_reads_the_nested_extra_info():
+    from custom_components.xiaomi_miot.core.utils import message_event_names
+
+    names = message_event_names(REAL_CAMERA_MESSAGE["params"]["body"])
+
+    # The specific type must outrank the generic notification name.
+    assert names.index("PeopleMotion") < names.index("smart_camera_motion")
+    assert "people_motion" in names
+
+
+def test_message_event_names_applies_aliases_first():
+    from custom_components.xiaomi_miot.core.utils import message_event_names
+
+    names = message_event_names(
+        REAL_CAMERA_MESSAGE["params"]["body"],
+        {"PeopleMotion": "someone_appeared"},
+    )
+
+    assert names[0] == "someone_appeared"
+
+
+def test_message_event_names_survives_unparsable_extra_info():
+    from custom_components.xiaomi_miot.core.utils import message_event_names
+
+    names = message_event_names({"event": "smart_camera_motion", "extra": {"extraInfo": "not json"}})
+
+    assert names == ["smart_camera_motion"]
+
+
+def test_message_event_names_handles_an_empty_body():
+    from custom_components.xiaomi_miot.core.utils import message_event_names
+
+    assert message_event_names({}) == []
+
+
+def test_dispatch_translates_a_real_camera_message(make_device, load_miot_spec):
+    """The shape actually observed on a C701: notification name, nested type."""
+    device = make_device(
+        load_miot_spec("test.generic.fallback.json"),
+        model="test.generic.fallback",
+        customizes={
+            "event_entities": True,
+            "cloud_events": {"PeopleMotion": "paper_jammed"},
+        },
+    )
+    entry = make_entry_with(device)
+    seen = []
+    device.add_listener(lambda data, only_info=False: seen.append(data))
+
+    assert entry.dispatch_device_event(REAL_CAMERA_MESSAGE) is True
+    assert any("event.printer.paper_jammed" in d for d in seen)
+
+
+def test_camera_alias_map_ships_for_every_camera():
+    """A user should not have to hand-write the mapping for a common device."""
+    from custom_components.xiaomi_miot.core.device_customizes import DEVICE_CUSTOMIZES
+
+    aliases = DEVICE_CUSTOMIZES["*.camera.*"]["cloud_events"]
+
+    # Both confirmed against a live chuangmi.camera.079ae2. Note the naming is
+    # not systematic — 'PeopleMotion' but plain 'Pet' — so these cannot be
+    # derived, only observed.
+    assert aliases["PeopleMotion"] == "someone_appeared"
+    assert aliases["Pet"] == "pet_appeared"
+
+
+def test_dispatch_routes_without_a_cloud_session(make_device, load_miot_spec):
+    """Regression: routing must not depend on which entry owns the cloud.
+
+    `HassEntry.get_cloud()` did not always pass `hass_entry=self` to
+    `MiotCloud.from_token`, so `cloud.hass_entry` could be None and every event
+    was silently dropped. Ownership of the *device* is what decides routing.
+    """
+    from custom_components.xiaomi_miot.core.hass_entry import HassEntry
+
+    device = make(make_device, load_miot_spec, event_entities=True)
+    entry = make_entry_with(device)
+    seen = []
+    device.add_listener(lambda data, only_info=False: seen.append(data))
+
+    original = dict(HassEntry.ALL)
+    HassEntry.ALL.clear()
+    HassEntry.ALL['test-entry'] = entry
+    try:
+        handled = HassEntry.dispatch_event_to_devices(REAL_CAMERA_MESSAGE)
+    finally:
+        HassEntry.ALL.clear()
+        HassEntry.ALL.update(original)
+
+    assert handled is False, 'no alias configured, so nothing should match'
+    assert seen == []
+
+
+def test_dispatch_to_devices_finds_the_owning_entry(make_device, load_miot_spec):
+    from custom_components.xiaomi_miot.core.hass_entry import HassEntry
+
+    other = make_device(
+        load_miot_spec("cnhdm.airrtc.wkq01.json"), model="cnhdm.airrtc.wkq01.other",
+    )
+    device = make_device(
+        load_miot_spec("test.generic.fallback.json"),
+        model="test.generic.fallback",
+        customizes={"event_entities": True, "cloud_events": {"PeopleMotion": "paper_jammed"}},
+    )
+    not_owning = make_entry_with(other)
+    not_owning.did_to_unique = {"someone-else": "unique"}
+    owning = make_entry_with(device)
+    seen = []
+    device.add_listener(lambda data, only_info=False: seen.append(data))
+
+    original = dict(HassEntry.ALL)
+    HassEntry.ALL.clear()
+    HassEntry.ALL['a'] = not_owning
+    HassEntry.ALL['b'] = owning
+    try:
+        handled = HassEntry.dispatch_event_to_devices(REAL_CAMERA_MESSAGE)
+    finally:
+        HassEntry.ALL.clear()
+        HassEntry.ALL.update(original)
+
+    assert handled is True
+    assert any("event.printer.paper_jammed" in d for d in seen)
+
+
+def test_pet_message_shape_from_a_live_camera():
+    """Regression: the pet alias was guessed as 'PetMotion' and never fired.
+
+    Captured payload from the Living Room C701, 2026-08-06 08:11.
+    """
+    from custom_components.xiaomi_miot.core.utils import message_event_names
+    from custom_components.xiaomi_miot.core.device_customizes import DEVICE_CUSTOMIZES
+
+    body = {
+        "event": "smart_camera_motion",
+        "extra": {
+            "extraInfo": '{"ver":"1.0.0","alarmStart":true,"eventType":"Pet","channel":"0"}',
+            "isAlarm": True,
+        },
+    }
+    names = message_event_names(body, DEVICE_CUSTOMIZES["*.camera.*"]["cloud_events"])
+
+    assert names[0] == "pet_appeared"
