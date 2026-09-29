@@ -589,16 +589,24 @@ async def _handle_device_registry_event(hass: hass_core.HomeAssistant):
         action = event.data['action']
         registry = dr.async_get(hass)
         device_id = event.data.get('device_id')
-        if device_id not in registry.devices:
-            return
-        device = registry.async_get(device_id)
-        if not device or not device.identifiers:
+        if lookup := getattr(dr, 'async_get_device_and_config_entry_for_domain', None):
+            device, config_entry = lookup(hass, device_id, domain=DOMAIN)
+            if not config_entry:
+                return
+            entry_ids = (config_entry.entry_id,)
+        else:
+            # HA before 2026.9 associates a device with several config entries.
+            device = registry.async_get(device_id)
+            if not device:
+                return
+            entry_ids = device.config_entries
+        if not device or not getattr(device, 'identifiers', None):
             return
         identifier = next(iter(device.identifiers))
         if identifier[0] != DOMAIN:
             return
         miot_device = None
-        for entry_id in device.config_entries:
+        for entry_id in entry_ids:
             entry = HassEntry.ALL.get(entry_id)
             if not entry:
                 continue
