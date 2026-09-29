@@ -3,6 +3,13 @@ name: Validate
 on:
   push:
   pull_request:
+  workflow_dispatch:
+  # Scheduled workflows run from the repository's default branch.
+  schedule:
+    - cron: "23 2 * * 1"
+
+permissions:
+  contents: read
 
 jobs:
   pytest:
@@ -20,10 +27,10 @@ jobs:
           cache-dependency-path: requirements_test.txt
 
       - name: 📦 Install test dependencies
-        run: pip install -r requirements_test.txt
+        run: pip3 install -r requirements_test.txt
 
       - name: 🧪 Run focused tests
-        run: python -m pytest -q
+        run: python3 -m pytest -q
 
   pytest-min:
     name: Pytest with minimum Home Assistant (2025.6.0)
@@ -40,10 +47,56 @@ jobs:
           cache-dependency-path: requirements_test_min.txt
 
       - name: 📦 Install minimum-version test dependencies
-        run: pip install -r requirements_test_min.txt
+        run: pip3 install -r requirements_test_min.txt
 
       - name: 🧪 Run focused tests
-        run: python -m pytest -q
+        run: python3 -m pytest -q
+
+  pytest-preview:
+    name: Pytest with Home Assistant ${{ matrix.channel }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        channel: [beta, dev]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - uses: astral-sh/setup-uv@v10
+
+      - name: Install newest published Home Assistant, including betas
+        if: matrix.channel == 'beta'
+        run: uv pip install --system --prerelease allow homeassistant
+
+      - name: Install development Home Assistant
+        if: matrix.channel == 'dev'
+        run: uv pip install --system 'homeassistant @ https://github.com/home-assistant/core/archive/refs/heads/dev.zip'
+
+      - name: Install test fixtures against the selected HA runtime
+        # The fixture package pins stable HA and some of its runtime dependencies.
+        # Override those pins only in preview jobs; keep its pytest tooling intact.
+        run: |
+          python3 - <<'PY' > "$RUNNER_TEMP/ha-preview-overrides.txt"
+          import json
+          from importlib.metadata import distribution
+          ha = distribution("homeassistant")
+          direct = ha.read_text("direct_url.json")
+          print("homeassistant @ " + json.loads(direct)["url"] if direct else "homeassistant==" + ha.version)
+          print("\n".join(ha.requires or []))
+          PY
+          uv pip install --system --upgrade -r requirements_test.txt --overrides "$RUNNER_TEMP/ha-preview-overrides.txt"
+
+      - name: Report tested versions and run the suite
+        run: |
+          python3 - <<'PY'
+          from importlib.metadata import version
+          for package in ("homeassistant", "pytest-homeassistant-custom-component"):
+              print(f"{package}: {version(package)}")
+          PY
+          python3 -m pytest -q
 
   validate-hassfest:
     runs-on: ubuntu-latest
@@ -71,7 +124,7 @@ jobs:
     name: With Home Assistant
     strategy:
       matrix:
-        channel: [stable, dev, "2025.6.0"]
+        channel: [stable, beta, dev, "2025.6.0"]
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Checkout the repository
