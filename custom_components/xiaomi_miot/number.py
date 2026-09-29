@@ -1,5 +1,8 @@
 """Support number entity for Xiaomi Miot."""
 import logging
+from decimal import Decimal, InvalidOperation
+
+from homeassistant.exceptions import ServiceValidationError
 
 from homeassistant.components.number import (
     DOMAIN as ENTITY_DOMAIN,
@@ -52,7 +55,40 @@ class NumberEntity(XEntity, RestoreNumber):
             return
         self._attr_native_value = val
 
+    def _validated_native_value(self, value: float) -> int | float:
+        minimum, maximum, step = (
+            Decimal(str(v)) for v in (self.native_min_value, self.native_max_value, self.native_step)
+        )
+        message = (
+            f"Invalid value {value} for {self.entity_id}: expected a finite value "
+            f"from {minimum} to {maximum} in steps of {step} starting at {minimum}"
+        )
+        if self._miot_property and self._miot_property.is_integer:
+            message += "; this property requires an integer"
+        try:
+            number = Decimal(str(value))
+            if not all(v.is_finite() for v in (number, minimum, maximum, step)) or step <= 0:
+                raise ServiceValidationError(message)
+            if not minimum <= number <= maximum:
+                raise ServiceValidationError(message)
+            tick = (number - minimum) / step
+            nearest = tick.to_integral_value()
+            # Accept representation noise, not a request for a different step.
+            if abs(tick - nearest) > Decimal('1e-9'):
+                raise ServiceValidationError(message)
+            number = minimum + nearest * step
+            if not minimum <= number <= maximum:
+                raise ServiceValidationError(message)
+            if self._miot_property and self._miot_property.is_integer:
+                if number != number.to_integral_value():
+                    raise ServiceValidationError(message)
+                return int(number)
+            return float(number)
+        except (InvalidOperation, ValueError, TypeError) as exc:
+            raise ServiceValidationError(message) from exc
+
     async def async_set_native_value(self, value: float):
+        value = self._validated_native_value(value)
         await self.device.async_write({self.attr: value})
 
         if self._miot_action:
