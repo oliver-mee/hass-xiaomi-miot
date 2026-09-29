@@ -3,7 +3,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from homeassistant.components.number import async_set_value
+from homeassistant.setup import async_setup_component
 from homeassistant.exceptions import ServiceValidationError
 from custom_components.xiaomi_miot.number import NumberEntity
 
@@ -34,8 +34,15 @@ async def test_invalid_numbers_never_write(hass, value, action):
 @pytest.mark.parametrize('value', [4, 4.7, float('nan')])
 async def test_ha_service_rejects_off_step_values(hass, value):
     entity = number_entity(hass, (1, 9, 2), integer=True)
+    entity._attr_available = True
+    entity.async_added_to_hass = AsyncMock()
+    entity.async_will_remove_from_hass = AsyncMock()
+    assert await async_setup_component(hass, 'number', {})
+    await hass.data['number'].async_add_entities([entity])
     with pytest.raises(ServiceValidationError):
-        await async_set_value(entity, SimpleNamespace(data={'value': value}))
+        await hass.services.async_call('number', 'set_value', {
+            'entity_id': entity.entity_id, 'value': value,
+        }, blocking=True)
     entity.device.async_write.assert_not_awaited()
 
 
