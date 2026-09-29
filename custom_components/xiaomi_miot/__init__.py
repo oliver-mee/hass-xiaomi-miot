@@ -309,7 +309,7 @@ async def async_setup_xiaomi_cloud(hass: hass_core.HomeAssistant, config_entry: 
         _LOGGER.error('Setup xiaomi cloud for user: %s failed: %s', username, exc)
         return False
     if not devices:
-        _LOGGER.debug('No Xiaomi cloud devices matched the configured filters for %s', username)
+        _LOGGER.warning('None device in xiaomi cloud: %s', username)
     else:
         _LOGGER.debug('Setup xiaomi cloud for user: %s, %s devices', username, len(devices))
     for d in devices.values():
@@ -589,18 +589,23 @@ async def _handle_device_registry_event(hass: hass_core.HomeAssistant):
         action = event.data['action']
         registry = dr.async_get(hass)
         device_id = event.data.get('device_id')
-        device = registry.async_get(device_id) if device_id else None
-        if not device or not device.identifiers:
+        if lookup := getattr(dr, 'async_get_device_and_config_entry_for_domain', None):
+            device, config_entry = lookup(hass, device_id, domain=DOMAIN)
+            if not config_entry:
+                return
+            entry_ids = (config_entry.entry_id,)
+        else:
+            # HA before 2026.9 associates a device with several config entries.
+            device = registry.async_get(device_id)
+            if not device:
+                return
+            entry_ids = device.config_entries
+        if not device or not getattr(device, 'identifiers', None):
             return
         identifier = next(iter(device.identifiers))
         if identifier[0] != DOMAIN:
             return
         miot_device = None
-        if hasattr(device, 'config_entry_id'):
-            # hass 2026.8+: a device belongs to a single config entry
-            entry_ids = [device.config_entry_id] if device.config_entry_id else []
-        else:
-            entry_ids = device.config_entries
         for entry_id in entry_ids:
             entry = HassEntry.ALL.get(entry_id)
             if not entry:

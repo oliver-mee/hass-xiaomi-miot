@@ -1,8 +1,14 @@
 """Tests for Xiaomi MIoT device registry compatibility."""
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
+import pytest
+from homeassistant.helpers import device_registry as dr
+from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+from custom_components.xiaomi_miot import DOMAIN, _handle_device_registry_event
 from custom_components.xiaomi_miot.core.device import Device, DeviceInfo
+from custom_components.xiaomi_miot.core.hass_entry import HassEntry
 
 
 def _make_device(hass, *, unique_id, entry_id="test-entry"):
@@ -85,82 +91,53 @@ def test_device_info_falls_back_to_parent_identifier(hass):
     assert "via_device_id" not in device_info
 
 
-async def _fire_device_registry_update(registry, device_id):
-    """Register the registry listener and invoke it with an update event."""
-    from custom_components.xiaomi_miot import _handle_device_registry_event
-
-    fake_hass = SimpleNamespace(bus=SimpleNamespace(async_listen=Mock()))
-    with patch(
-        "custom_components.xiaomi_miot.dr.async_get",
-        return_value=registry,
-    ):
-        await _handle_device_registry_event(fake_hass)
-        listener = fake_hass.bus.async_listen.call_args.args[1]
-        await listener(SimpleNamespace(data={"action": "update", "device_id": device_id}))
-
-
-def _make_registry_device(**kwargs):
-    return SimpleNamespace(
-        id="device-id",
-        identifiers={("xiaomi_miot", "aa:bb:cc:dd:ee:01")},
-        name_by_user=None,
-        disabled=False,
-        **kwargs,
+@pytest.mark.parametrize('action', ['disable', 'enable', 'delete'])
+async def test_registry_updates_use_supported_ownership_api(
+    hass, device_registry, monkeypatch, caplog, action,
+):
+    config_entry = MockConfigEntry(domain=DOMAIN)
+    config_entry.add_to_hass(hass)
+    device = device_registry.async_get_or_create(
+        config_entry_id=config_entry.entry_id,
+        identifiers={(DOMAIN, 'test-mac')},
     )
-
-
-def _make_miot_device():
+    if action == 'disable':
+        device_registry.async_update_device(device.id, disabled_by=dr.DeviceEntryDisabler.USER)
+    elif action == 'delete':
+        device_registry.async_update_device(device.id, name_by_user='delete')
+    await hass.async_block_till_done()
     miot_device = SimpleNamespace(
-        identifiers={("xiaomi_miot", "aa:bb:cc:dd:ee:01")},
-        coordinators=[],
+        identifiers=device.identifiers,
+        coordinators=[] if action == 'enable' else [object()],
+        async_unload=AsyncMock(),
+        init_coordinators=AsyncMock(),
         log=Mock(),
     )
+    monkeypatch.setattr(HassEntry, 'ALL', {
+        config_entry.entry_id: SimpleNamespace(devices={'test': miot_device}),
+    })
+    await _handle_device_registry_event(hass)
+    caplog.clear()
 
-    async def init_coordinators():
-        miot_device.init_called = True
+    hass.bus.async_fire(dr.EVENT_DEVICE_REGISTRY_UPDATED, {
+        'action': 'update', 'device_id': device.id, 'changes': {},
+    })
+    await hass.async_block_till_done()
 
-    miot_device.init_coordinators = init_coordinators
-    return miot_device
-
-
-async def test_registry_event_uses_single_config_entry_id():
-    """Avoid deprecated registry.devices and DeviceEntry.config_entries access."""
-    device = _make_registry_device(config_entry_id="test-entry")
-    registry = Mock(spec=["async_get", "async_remove_device"])
-    registry.async_get.return_value = device
-    miot_device = _make_miot_device()
-    entry = SimpleNamespace(devices={"did": miot_device})
-
-    with patch.dict(
-        "custom_components.xiaomi_miot.HassEntry.ALL", {"test-entry": entry}
-    ):
-        await _fire_device_registry_update(registry, device.id)
-
-    registry.async_get.assert_called_once_with(device.id)
-    assert getattr(miot_device, "init_called", False)
+    if action == 'enable':
+        miot_device.init_coordinators.assert_awaited_once_with()
+        miot_device.async_unload.assert_not_awaited()
+    else:
+        miot_device.async_unload.assert_awaited_once_with()
+        miot_device.init_coordinators.assert_not_awaited()
+    assert (device_registry.async_get(device.id) is None) is (action == 'delete')
+    assert not [record for record in caplog.records if 'deprecated' in record.message.lower()]
+    assert not [record for record in caplog.records if record.levelno >= 40]
 
 
-async def test_registry_event_falls_back_to_config_entries():
-    """Keep working on HA versions without DeviceEntry.config_entry_id."""
-    device = _make_registry_device(config_entries={"test-entry"})
-    registry = Mock(spec=["async_get", "async_remove_device"])
-    registry.async_get.return_value = device
-    miot_device = _make_miot_device()
-    entry = SimpleNamespace(devices={"did": miot_device})
-
-    with patch.dict(
-        "custom_components.xiaomi_miot.HassEntry.ALL", {"test-entry": entry}
-    ):
-        await _fire_device_registry_update(registry, device.id)
-
-    assert getattr(miot_device, "init_called", False)
-
-
-async def test_registry_event_ignores_removed_device():
-    """A removed device is no longer in the registry and is ignored."""
-    registry = Mock(spec=["async_get", "async_remove_device"])
-    registry.async_get.return_value = None
-
-    await _fire_device_registry_update(registry, "gone-device-id")
-
-    registry.async_remove_device.assert_not_called()
+async def test_registry_update_ignores_removed_device(hass, device_registry):
+    await _handle_device_registry_event(hass)
+    hass.bus.async_fire(dr.EVENT_DEVICE_REGISTRY_UPDATED, {
+        'action': 'remove', 'device_id': 'missing',
+    })
+    await hass.async_block_till_done()
