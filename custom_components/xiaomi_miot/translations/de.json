@@ -66,7 +66,7 @@
             },
             "reauth_verify": {
                 "title": "Xiaomi erneut authentifizieren — Bestätigungscode eingeben",
-                "description": "Öffnen Sie [diesen Link]({verify_url}) in Ihrem Browser, fordern Sie einen Code an und fügen Sie anschließend den Bestätigungscode hier ein.",
+                "description": "Bei E-Mail-Verifizierung geben Sie den per E-Mail gesendeten Code ein. Für andere Methoden öffnen Sie [diesen Link]({verify_url}) und schließen die Verifizierung ab.",
                 "data": {
                     "verify_ticket": "Bestätigungscode"
                 }

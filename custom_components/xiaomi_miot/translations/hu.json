@@ -66,7 +66,7 @@
             },
             "reauth_verify": {
                 "title": "Xiaomi újrahitelesítés — adja meg az ellenőrző kódot",
-                "description": "Nyissa meg [ezt a hivatkozást]({verify_url}) a böngészőjében, kérjen kódot, majd illessze be ide az ellenőrző kódot.",
+                "description": "E-mailes ellenőrzéshez adja meg az e-mailben kapott kódot. Más módszerekhez nyissa meg [ezt a hivatkozást]({verify_url}), és végezze el az ellenőrzést.",
                 "data": {
                     "verify_ticket": "Ellenőrző kód"
                 }
