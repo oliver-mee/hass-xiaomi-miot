@@ -26,6 +26,8 @@ import random
 import time
 from typing import TYPE_CHECKING, Optional
 
+from miio.protocol import Message as MiioMessage
+
 from homeassistant.core import HomeAssistant
 
 from .utils import DeviceException
@@ -51,6 +53,8 @@ class LanDevice:
         self.did = device.info.did
         self.host = host
         self.token = bytes.fromhex(token)
+        if len(self.token) != 16:
+            raise ValueError("LAN tokens must contain 16 bytes")
         self.key = hashlib.md5(self.token).digest()
         self.iv = hashlib.md5(self.key + self.token).digest()
         self.device_id: Optional[int] = None
@@ -95,18 +99,37 @@ class LanDevice:
         raw += hashlib.md5(raw + self.token + data).digest()
         return raw + data
 
-    def parse(self, raw: bytes) -> Optional[dict]:
-        if raw[:2] != b'\x21\x31' or len(raw) <= 32:
+    def _parse_frame(self, raw: bytes):
+        if len(raw) < 32 or raw[:2] != b'\x21\x31':
+            return None
+        if int.from_bytes(raw[2:4], 'big') != len(raw):
+            return None
+        if self.device_id is not None and int.from_bytes(raw[8:12], 'big') != self.device_id:
             return None
         try:
-            return json.loads(self.decrypt(raw[32:]).rstrip(b'\x00'))
-        except Exception as exc:  # noqa: BLE001 - a foreign packet must not kill the listener
-            _LOGGER.debug('%s: undecodable lan packet: %s', self.did, exc)
+            return MiioMessage.parse(raw, token=self.token)
+        except Exception:  # noqa: BLE001 - malformed network input
+            _LOGGER.debug('%s: invalid lan packet', self.did)
             return None
 
-    def note_hello(self, raw: bytes):
-        self.device_id = int.from_bytes(raw[8:12], 'big')
+    def parse(self, raw: bytes) -> Optional[dict]:
+        if len(raw) <= 32:
+            return None
+        frame = self._parse_frame(raw)
+        if frame is None or not isinstance(frame.data.value, dict):
+            return None
+        return frame.data.value
+
+    def note_hello(self, raw: bytes) -> bool:
+        # Hello responses have no authenticated checksum in the miIO protocol.
+        if len(raw) != 32 or self._parse_frame(raw) is None:
+            return False
+        device_id = int.from_bytes(raw[8:12], 'big')
+        if device_id in (0, 0xffffffff):
+            return False
+        self.device_id = device_id
         self.delta_ts = time.time() - int.from_bytes(raw[12:16], 'big')
+        return True
 
 
 class MiotLanListener:
@@ -240,7 +263,8 @@ class MiotLanListener:
 
         if len(data) == 32:
             first = lan.device_id is None
-            lan.note_hello(data)
+            if not lan.note_hello(data):
+                return
             if first:
                 self._subscribe(lan)
             return
@@ -249,13 +273,11 @@ class MiotLanListener:
         if not msg:
             return
 
-        if 'id' in msg:
-            # Ack before anything else can fail, or the device retries for ~4s
-            # and then gives up with `user ack timeout`.
-            self._send(lan, {'id': msg['id'], 'result': {'code': 0}})
-
         if msg.get('id') == lan.sub_id and 'result' in msg:
-            lan.subscribed = msg.get('result', {}).get('code') == 0
+            result = msg['result']
+            if not isinstance(result, dict) or type(result.get('code')) is not int:
+                return
+            lan.subscribed = result['code'] == 0
             _LOGGER.info(
                 'Miot lan subscribe %s: %s',
                 'ok' if lan.subscribed else 'failed', lan.device.name_model)
@@ -264,11 +286,24 @@ class MiotLanListener:
         method = msg.get('method')
         if method not in ('properties_changed', 'event_occured'):
             return
+        if type(msg.get('id')) is not int:
+            return
+        params = msg.get('params')
+        values = params if isinstance(params, list) else [params]
+        iid = 'piid' if method == 'properties_changed' else 'eiid'
+        if not values or any(
+            not isinstance(value, dict)
+            or type(value.get('siid')) is not int or value['siid'] <= 0
+            or type(value.get(iid)) is not int or value[iid] <= 0
+            for value in values
+        ):
+            return
+        # Acknowledge valid uplinks, including duplicates, but never responses.
+        self._send(lan, {'id': msg['id'], 'result': {'code': 0}})
         if self._is_duplicate(lan.did, msg.get('id')):
             return
 
-        params = msg.get('params')
-        payload = lan.device.decode(params if isinstance(params, list) else [params])
+        payload = lan.device.decode(values)
         if payload:
             lan.device.dispatch(payload)
 
