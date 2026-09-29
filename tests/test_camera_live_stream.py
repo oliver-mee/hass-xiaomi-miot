@@ -18,9 +18,9 @@ def freeze_camera_clock(monkeypatch):
     )
 
 
-def make_c701_camera(make_device, load_miot_spec, *, customizes=None):
+def make_test_camera(make_device, load_miot_spec, *, customizes=None):
     device = make_device(
-        load_miot_spec('chuangmi.camera.079ae2.json'),
+        load_miot_spec('test.generic.camera_stream.json'),
         model='chuangmi.camera.079ae2',
         customizes=customizes,
     )
@@ -29,13 +29,13 @@ def make_c701_camera(make_device, load_miot_spec, *, customizes=None):
     return device, entity
 
 
-def test_c701_uses_live_hls_action_and_respects_rtsp_setting(make_device, load_miot_spec):
-    _, camera = make_c701_camera(make_device, load_miot_spec)
+def test_camera_uses_live_hls_action_and_respects_rtsp_setting(make_device, load_miot_spec):
+    _, camera = make_test_camera(make_device, load_miot_spec)
     assert camera._live_service.name == 'camera_stream_for_google_home'
     assert camera._live_start_action.name == 'start_hls_stream'
     assert camera.supported_features & CameraEntityFeature.STREAM
 
-    _, rtsp_camera = make_c701_camera(
+    _, rtsp_camera = make_test_camera(
         make_device,
         load_miot_spec,
         customizes={'use_rtsp_stream': True},
@@ -52,7 +52,7 @@ async def test_live_url_is_private_cached_until_expiry_then_refreshed(
         'custom_components.xiaomi_miot.camera.time',
         SimpleNamespace(time=lambda: clock[0]),
     )
-    _, camera = make_c701_camera(make_device, load_miot_spec)
+    _, camera = make_test_camera(make_device, load_miot_spec)
     camera.device.cloud.async_request_miot_spec.side_effect = [
         {'code': 0},
         {'code': 0, 'out': ['https://stream.example/live-one.m3u8?token=secret-one', (clock[0] + 60) * 1000]},
@@ -86,7 +86,7 @@ async def test_live_url_is_private_cached_until_expiry_then_refreshed(
 
 
 async def test_concurrent_live_requests_share_one_start_action(make_device, load_miot_spec):
-    _, camera = make_c701_camera(make_device, load_miot_spec)
+    _, camera = make_test_camera(make_device, load_miot_spec)
     started = asyncio.Event()
     release = asyncio.Event()
     start_calls = 0
@@ -117,7 +117,7 @@ async def test_concurrent_live_requests_share_one_start_action(make_device, load
 
 
 async def test_cancellation_releases_live_stream_lock_for_retry(make_device, load_miot_spec):
-    _, camera = make_c701_camera(make_device, load_miot_spec)
+    _, camera = make_test_camera(make_device, load_miot_spec)
     started = asyncio.Event()
     start_calls = 0
 
@@ -146,7 +146,7 @@ async def test_cancellation_releases_live_stream_lock_for_retry(make_device, loa
 async def test_live_failure_does_not_fall_back_to_motion_clip_and_can_retry(
     make_device, load_miot_spec, caplog
 ):
-    _, camera = make_c701_camera(make_device, load_miot_spec)
+    _, camera = make_test_camera(make_device, load_miot_spec)
     camera._attr_stream_source = 'https://motion.example/clip.m3u8?token=motion-secret'
     camera.device.cloud.async_request_miot_spec.side_effect = [
         {'code': 0},
@@ -164,7 +164,7 @@ async def test_live_failure_does_not_fall_back_to_motion_clip_and_can_retry(
 
 @pytest.mark.parametrize('output', [None, 12, 'bad', {}, [], ['url'], [None, 1]])
 async def test_malformed_live_output_is_recoverable(make_device, load_miot_spec, output):
-    _, camera = make_c701_camera(make_device, load_miot_spec)
+    _, camera = make_test_camera(make_device, load_miot_spec)
     camera.device.cloud.async_request_miot_spec.side_effect = [
         {'code': 0}, {'code': 0, 'out': output},
     ]
@@ -173,7 +173,7 @@ async def test_malformed_live_output_is_recoverable(make_device, load_miot_spec,
 
 @pytest.mark.parametrize('expiry', [0, 1_699_999_999_000, 'bad', float('inf'), float('nan')])
 async def test_expired_or_invalid_expiry_is_never_cached(make_device, load_miot_spec, expiry):
-    _, camera = make_c701_camera(make_device, load_miot_spec)
+    _, camera = make_test_camera(make_device, load_miot_spec)
     camera.device.cloud.async_request_miot_spec.side_effect = [
         {'code': 0}, {'code': 0, 'out': ['https://stream.example/live', expiry]},
     ]
@@ -182,7 +182,7 @@ async def test_expired_or_invalid_expiry_is_never_cached(make_device, load_miot_
 
 
 async def test_camera_caches_are_isolated(make_device, load_miot_spec):
-    cameras = [make_c701_camera(make_device, load_miot_spec)[1] for _ in range(2)]
+    cameras = [make_test_camera(make_device, load_miot_spec)[1] for _ in range(2)]
     for index, camera in enumerate(cameras):
         camera.device.cloud.async_request_miot_spec.side_effect = [
             {'code': 0}, {'code': 0, 'out': [f'https://stream.example/{index}', None]},
@@ -190,3 +190,23 @@ async def test_camera_caches_are_isolated(make_device, load_miot_spec):
     assert await asyncio.gather(*(c.stream_source() for c in cameras)) == [
         'https://stream.example/0', 'https://stream.example/1',
     ]
+
+
+@pytest.mark.parametrize('rtsp', [False, True])
+async def test_c701_published_spec_action_and_expiry(make_device, load_miot_spec, rtsp):
+    """Primary MIoT fixture: chuangmi-079ae2:1:0000D070, services 28/29."""
+    device = make_device(load_miot_spec('chuangmi.camera.079ae2.json'),
+                         model='chuangmi.camera.079ae2',
+                         customizes={'use_rtsp_stream': rtsp})
+    device.cloud = SimpleNamespace(async_request_miot_spec=AsyncMock(side_effect=[
+        {'code': 0},
+        {'code': 0, 'out': ['rtsp://stream.example/live', 'https://image.example/', 3600]
+         if rtsp else ['https://stream.example/live.m3u8']},
+    ]))
+    camera = CameraEntity(device, BaseConv(attr='camera_control', domain='camera'))
+    assert await camera.stream_source()
+    device.cloud.async_request_miot_spec.assert_awaited_with('action', {
+        'did': 'test-device', 'siid': 29 if rtsp else 28, 'aiid': 2 if rtsp else 3,
+        'in': [{'piid': 2, 'value': 1}],
+    }, debug=False)
+    assert camera._live_expire == 1_700_000_000 + (3590 if rtsp else 270)

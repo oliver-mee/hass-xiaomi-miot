@@ -406,7 +406,17 @@ class CameraEntity(XEntity, BaseCameraEntity):
                 expiration = now + 270
             else:
                 try:
-                    expiration = float(expiration) / 1000 - 10
+                    expiration = float(expiration)
+                    # Devices return either epoch milliseconds/seconds or a
+                    # duration in the spec's seconds range (C701 RTSP).
+                    if expiration > 100_000_000_000:
+                        expiration = expiration / 1000 - 10
+                    elif (self._live_expiration_time.unit == 'seconds'
+                          and self._live_expiration_time.value_range
+                          and 0 < expiration <= self._live_expiration_time.value_range[1] <= 86400):
+                        expiration = time.time() + expiration - 10
+                    else:
+                        expiration -= 10
                 except (TypeError, ValueError, OverflowError):
                     return None
                 if not math.isfinite(expiration) or expiration <= time.time():
