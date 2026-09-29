@@ -1,5 +1,7 @@
 """Support for Xiaomi cameras."""
+import asyncio
 import logging
+import math
 import json
 import time
 import locale
@@ -7,6 +9,7 @@ import base64
 import requests
 import re
 import collections
+import aiohttp
 from os import urandom
 from functools import partial
 from urllib.parse import urlencode
@@ -284,6 +287,40 @@ class CameraEntity(XEntity, BaseCameraEntity):
         BaseCameraEntity.__init__(self, self.hass)
         self._attr_brand = self.device_info.get('manufacturer')
         self._attr_model = self.device_info.get('model')
+        self._attr_supported_features = CameraEntityFeature(0)
+        self._live_service = None
+        self._live_start_action = None
+        self._live_stop_action = None
+        self._live_stream_address = None
+        self._live_expiration_time = None
+        self._live_url = None
+        self._live_expire = 0
+        self._live_lock = asyncio.Lock()
+
+        spec = getattr(self.device, 'spec', None)
+        services = ['camera_stream_for_google_home', 'camera_stream_for_amazon_alexa']
+        if self.custom_config_bool('use_rtsp_stream'):
+            services.reverse()
+        for name in services:
+            service = spec.get_service(name) if spec else None
+            action = service.get_action('start_hls_stream', 'start_rtsp_stream') if service else None
+            address = service.get_property('stream_address') if service else None
+            if not (action and address):
+                continue
+            self._live_service = service
+            self._live_start_action = action
+            self._live_stop_action = service.get_action('stop_stream')
+            self._live_stream_address = address
+            self._live_expiration_time = service.get_property('expiration_time')
+            self._attr_supported_features |= CameraEntityFeature.STREAM
+            self._supported_features |= CameraEntityFeature.STREAM
+            break
+
+    @property
+    def supported_features(self):
+        features = int(getattr(self, '_attr_supported_features', 0) or 0)
+        features |= int(getattr(self, '_supported_features', 0) or 0)
+        return CameraEntityFeature(features)
 
     async def async_added_to_hass(self):
         await super().async_added_to_hass()
@@ -300,10 +337,83 @@ class CameraEntity(XEntity, BaseCameraEntity):
             self.update_motion_video(self.device.props)
 
     async def image_source(self):
+        if self._live_start_action:
+            return await self.async_get_live_url() or self._attr_camera_image
         return self._attr_camera_image
 
     async def stream_source(self):
+        if self._live_start_action:
+            return await self.async_get_live_url()
         return self._attr_stream_source
+
+    async def async_get_live_url(self):
+        if not self._live_start_action or not self.device.cloud:
+            return None
+        now = time.time()
+        if self._live_url and now < self._live_expire:
+            return self._live_url
+
+        async with self._live_lock:
+            now = time.time()
+            if self._live_url and now < self._live_expire:
+                return self._live_url
+            self._live_url = None
+            camera_name = getattr(self, '_attr_name', None) or self._attr_unique_id
+
+            video_attribute = self.custom_config_integer('video_attribute')
+            video_property = self._live_service.get_property('video_attribute')
+            if video_attribute is None and video_property and video_property.value_list:
+                video_attribute = (video_property.value_list[0] or {}).get('value')
+
+            async def call_action(action, params):
+                request = {
+                    'did': str(self.device.did),
+                    'siid': action.service.iid,
+                    'aiid': action.iid,
+                    'in': action.in_params(params),
+                }
+                return await self.device.cloud.async_request_miot_spec(
+                    'action', request, debug=False
+                )
+
+            try:
+                if self._live_stop_action:
+                    await call_action(self._live_stop_action, [])
+                result = await call_action(
+                    self._live_start_action,
+                    [] if video_attribute is None else [video_attribute],
+                )
+            except (MiCloudException, aiohttp.ClientError, asyncio.TimeoutError, OSError):
+                self.log.warning('%s: Unable to obtain live camera stream', camera_name)
+                return None
+
+            if not isinstance(result, dict) or result.get('code') not in (0, 1):
+                self.log.warning('%s: Live camera stream response was invalid', camera_name)
+                return None
+            raw_output = result.get('out')
+            if not isinstance(raw_output, list):
+                return None
+            output = self._live_start_action.out_results(raw_output) or {}
+            url = self._live_stream_address.from_dict(output)
+            if not isinstance(url, str) or not url:
+                self.log.warning('%s: Live camera stream address was not returned', camera_name)
+                return None
+
+            expiration = None
+            if self._live_expiration_time:
+                expiration = self._live_expiration_time.from_dict(output)
+            if expiration is None:
+                expiration = now + 270
+            else:
+                try:
+                    expiration = float(expiration) / 1000 - 10
+                except (TypeError, ValueError, OverflowError):
+                    return None
+                if not math.isfinite(expiration) or expiration <= time.time():
+                    return None
+            self._live_expire = expiration
+            self._live_url = url
+            return self._live_url
 
     def update_motion_video(self, data: dict):
         tim = data.get('motion_video_time')
