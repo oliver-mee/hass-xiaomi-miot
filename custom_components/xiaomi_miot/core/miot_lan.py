@@ -43,6 +43,8 @@ HELLO = bytes.fromhex('21310020' + 'ffffffff' * 7)
 KEEPALIVE_SECONDS = 25
 RESUBSCRIBE_SECONDS = 300
 DEDUP_SECONDS = 5
+SUBSCRIBE_TIMEOUT_SECONDS = KEEPALIVE_SECONDS
+STALE_SECONDS = KEEPALIVE_SECONDS * 3
 
 
 class LanDevice:
@@ -62,6 +64,11 @@ class LanDevice:
         self.subscribed = False
         self.sub_id: Optional[int] = None
         self.sub_ts = 0.0
+        self.pending_since: Optional[float] = None
+        self.last_attempt: Optional[float] = None
+        self.last_confirmed: Optional[float] = None
+        self.last_seen: Optional[float] = None
+        self.request_id = random.randint(100000000, 999999999)
 
     # -- crypto -----------------------------------------------------------
 
@@ -129,6 +136,7 @@ class LanDevice:
             return False
         self.device_id = device_id
         self.delta_ts = time.time() - int.from_bytes(raw[12:16], 'big')
+        self.last_seen = time.monotonic()
         return True
 
 
@@ -221,10 +229,15 @@ class MiotLanListener:
             _LOGGER.debug('%s: lan send failed: %s', lan.did, exc)
 
     def _handshake(self, lan: LanDevice):
-        self._sendto(lan.host, HELLO)
+        try:
+            self._sendto(lan.host, HELLO)
+        except OSError as exc:
+            _LOGGER.debug('%s: lan hello failed: %s', lan.did, exc)
 
     def _subscribe(self, lan: LanDevice):
-        lan.sub_id = random.randint(100000000, 999999999)
+        lan.request_id = (lan.request_id + 1) % 1000000000
+        lan.sub_id = lan.request_id
+        lan.pending_since = lan.last_attempt = time.monotonic()
         lan.sub_ts = time.time()
         self._send(lan, {
             'id': lan.sub_id,
@@ -245,14 +258,31 @@ class MiotLanListener:
         self._unsub_timer = async_track_time_interval(
             self.hass, self._keepalive, timedelta(seconds=KEEPALIVE_SECONDS))
 
+    def _expire_subscription(self, lan: LanDevice, now: float):
+        if lan.pending_since is not None and now - lan.pending_since >= SUBSCRIBE_TIMEOUT_SECONDS:
+            lan.pending_since = None
+            lan.sub_id = None
+            lan.subscribed = False
+        if lan.last_seen is not None and now - lan.last_seen >= STALE_SECONDS:
+            lan.subscribed = False
+
+    def _maybe_subscribe(self, lan: LanDevice, now: float):
+        self._expire_subscription(lan, now)
+        if lan.pending_since is not None or lan.device_id is None:
+            return
+        if lan.last_seen is None or now - lan.last_seen >= STALE_SECONDS:
+            return
+        if lan.last_attempt is not None and now - lan.last_attempt < SUBSCRIBE_TIMEOUT_SECONDS:
+            return
+        if not lan.subscribed or lan.last_confirmed is None or now - lan.last_confirmed >= RESUBSCRIBE_SECONDS:
+            self._subscribe(lan)
+
     async def _keepalive(self, _now=None):
-        now = time.time()
+        now = time.monotonic()
         for lan in list(self.devices.values()):
+            self._expire_subscription(lan, now)
             self._handshake(lan)
-            # A subscription is not advertised as expiring, so renew on a timer
-            # rather than waiting to notice it has gone quiet.
-            if lan.subscribed and now - lan.sub_ts > RESUBSCRIBE_SECONDS:
-                self._subscribe(lan)
+            self._maybe_subscribe(lan, now)
 
     # -- receive ----------------------------------------------------------
 
@@ -262,22 +292,29 @@ class MiotLanListener:
             return
 
         if len(data) == 32:
-            first = lan.device_id is None
             if not lan.note_hello(data):
                 return
-            if first:
-                self._subscribe(lan)
+            self._maybe_subscribe(lan, time.monotonic())
             return
 
         msg = lan.parse(data)
         if not msg:
             return
 
-        if msg.get('id') == lan.sub_id and 'result' in msg:
+        now = time.monotonic()
+        if type(msg.get('id')) is int and lan.pending_since is not None and msg['id'] == lan.sub_id and 'result' in msg:
             result = msg['result']
             if not isinstance(result, dict) or type(result.get('code')) is not int:
                 return
+            self._expire_subscription(lan, now)
+            if lan.pending_since is None:
+                return
+            lan.last_seen = now
             lan.subscribed = result['code'] == 0
+            lan.pending_since = None
+            lan.sub_id = None
+            if lan.subscribed:
+                lan.last_confirmed = now
             _LOGGER.info(
                 'Miot lan subscribe %s: %s',
                 'ok' if lan.subscribed else 'failed', lan.device.name_model)
@@ -298,6 +335,7 @@ class MiotLanListener:
             for value in values
         ):
             return
+        lan.last_seen = now
         # Acknowledge valid uplinks, including duplicates, but never responses.
         self._send(lan, {'id': msg['id'], 'result': {'code': 0}})
         if self._is_duplicate(lan.did, msg.get('id')):
@@ -312,7 +350,7 @@ class MiotLanListener:
         if msg_id is None:
             return False
         key = f'{did}.{msg_id}'
-        now = time.time()
+        now = time.monotonic()
         for k, ts in list(self._recent.items()):
             if now - ts > DEDUP_SECONDS:
                 del self._recent[k]
