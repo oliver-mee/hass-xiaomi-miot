@@ -11,6 +11,8 @@ from homeassistant.components import persistent_notification
 from homeassistant.helpers.event import async_call_later, async_track_time_interval
 import homeassistant.helpers.device_registry as dr
 
+# Load protocol dependencies with the integration, outside the event loop.
+from .miot_lan import MiotLanListener
 from .const import (
     DOMAIN,
     DEVICE_CUSTOMIZES,
@@ -220,7 +222,6 @@ class Device(CustomConfigHelper):
             # Deliberately independent of conn_mode: properties can keep coming
             # over the cloud while events arrive by push. Event transport and
             # property transport are separate concerns.
-            from .miot_lan import MiotLanListener
             await MiotLanListener.get(self.hass).async_add_device(self)
 
         if not self.coordinators:
@@ -275,7 +276,6 @@ class Device(CustomConfigHelper):
 
     async def async_unload(self):
         if self.custom_config_bool('lan_events', False):
-            from .miot_lan import MiotLanListener
             MiotLanListener.get(self.hass).async_remove_device(self.info.did)
 
         for coo in self.coordinators:
