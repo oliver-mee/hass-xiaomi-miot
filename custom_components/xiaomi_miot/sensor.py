@@ -657,41 +657,81 @@ class XiaoaiConversationSensor(MiCoordinatorEntity, BaseSensorSubEntity):
             'deviceId': aid,
         }
         try:
-            res = await mic.async_request_api(api, data=dat, method='GET', cookies=cks) or {}
-            rdt = res.get('data', {})
+            res = await mic.async_request_api(api, data=dat, method='GET', cookies=cks)
+            if not isinstance(res, dict):
+                raise ValueError('conversation response is not an object')
+
+            rdt = res.get('data')
+            if isinstance(rdt, str):
+                rdt = json.loads(rdt)
             if not isinstance(rdt, dict):
-                rdt = json.loads(rdt) or {}
-        except (TypeError, ValueError, Exception) as exc:
-            rdt = {}
+                raise ValueError('conversation data is not an object')
+
+            raw_records = rdt.get('records')
+            if not isinstance(raw_records, list) or any(
+                not isinstance(record, dict) for record in raw_records
+            ):
+                raise ValueError('conversation records are not objects')
+            if any(
+                'query' in record
+                and record['query'] is not None
+                and not isinstance(record['query'], str)
+                for record in raw_records
+            ):
+                raise ValueError('conversation query is not a string')
+
+            # Work only with copies: callers may retain and reuse the API response.
+            records = [dict(record) for record in raw_records]
+            if not records:
+                return {}
+            msg = records[0]
+            answers = msg.get('answers', [])
+            if not isinstance(answers, list) or any(
+                not isinstance(answer, dict) for answer in answers
+            ):
+                raise ValueError('conversation answers are not objects')
+
+            tim = msg.get('time')
+            timestamp = None
+            if tim is not None:
+                if isinstance(tim, bool) or not isinstance(tim, (int, float)):
+                    raise ValueError('conversation timestamp is not numeric')
+                timestamp = datetime.fromtimestamp(tim / 1000, local_zone())
+
+            answer_attrs = []
+            for value in answers:
+                answer = {
+                    key: item for key, item in value.items() if key != 'bitSet'
+                }
+                typ = str(answer.get('type', '')).lower()
+                typed = answer.get(typ)
+                if isinstance(typed, dict):
+                    answer[typ] = {
+                        key: item for key, item in typed.items() if key != 'bitSet'
+                    }
+                answer_attrs.append(answer)
+
+            content = msg.get('query')
+            history = [record.get('query') for record in records[1:]]
+        except Exception as exc:
+            # asyncio.CancelledError inherits BaseException and must propagate.
             _LOGGER.warning(
                 '%s: Got exception while fetch xiaoai conversation: %s',
                 self.name_model, [aid, exc],
             )
-        mls = rdt.get('records') or []
-        msg = mls.pop(0) if mls else {}
+            return {}
+
         self.conversation = msg
         old = self._attr_native_value
-        if con := msg.get('query'):
-            self._state = con
-            self._attr_native_value = con
+        if content:
+            self._state = content
+            self._attr_native_value = content
             logger = _LOGGER.info if old != self._attr_native_value else _LOGGER.debug
             logger('%s: New xiaoai conversation: %s', self.name_model, self._attr_native_value)
-        tim = msg.get('time')
-        ans = []
-        for v in msg.get('answers', []):
-            if not isinstance(v, dict):
-                continue
-            typ = v.get('type', '').lower()
-            v.pop('bitSet', None)
-            v.get(typ, {}).pop('bitSet', None)
-            ans.append(v)
         self._state_attrs.update({
-            'content': con,
-            'answers': ans,
-            'history': [
-                v.get('query')
-                for v in mls
-            ],
-            'timestamp': datetime.fromtimestamp(tim / 1000, local_zone()) if tim else None,
+            'content': content,
+            'answers': answer_attrs,
+            'history': history,
+            'timestamp': timestamp,
         })
         return msg
