@@ -14,6 +14,10 @@ fork's **Xiaomi Miot** entry. Check the repository owner before downloading;
 installing the community upstream replaces the fork's additional features.
 Use a tagged release, take a full HA backup, install through HACS, then restart HA.
 
+Version 1.2.1 corrects relative-seconds stream expiry and adds a fixture from
+the published C701 spec. Household live playback remains under investigation;
+a returned stream URL alone is not proof of playable video.
+
 Version 1.2.0 adds live HLS/RTSP support for converter-based cameras with the
 corresponding MIoT services, including C701, and account/region/home-scoped
 manual-scene buttons. Scenes run only when pressed. Live URLs are cached per
