@@ -332,3 +332,71 @@ async def test_local_refresh_does_not_enable_lan_events(
     assert listener.devices == {}
     assert listener._transport.sent == []
     assert ('lan_listener' in hass.data[DOMAIN]) is has_listener
+
+
+@pytest.mark.parametrize('damage', ['checksum', 'length', 'identity', 'padding', 'json_shape'])
+def test_invalid_packet_cannot_dispatch_or_poison_dedup(listener, lan, damage):
+    seen = []
+    lan.device.add_listener(lambda data, only_info=False: seen.append(data))
+    good = lan.frame({'id': 123, 'method': 'event_occured',
+                      'params': {'siid': 2, 'eiid': 1, 'arguments': []}})
+    bad = bytearray(good)
+    if damage == 'checksum':
+        bad[16] ^= 1
+    elif damage == 'length':
+        bad[3] ^= 1
+    elif damage == 'identity':
+        bad[8] ^= 1
+        bad[16:32] = hashlib.md5(bytes(bad[:16]) + lan.token + bytes(bad[32:])).digest()
+    elif damage == 'padding':
+        bad = bad[:-1]
+        bad[2:4] = len(bad).to_bytes(2, 'big')
+        bad[16:32] = hashlib.md5(bytes(bad[:16]) + lan.token + bytes(bad[32:])).digest()
+    else:
+        bad = lan.frame([1])
+    from custom_components.xiaomi_miot.core.miot_lan import _LanProtocol
+    protocol = _LanProtocol(listener)
+    protocol.datagram_received(bytes(bad), (lan.host, 54321))
+    assert seen == []
+    assert listener._transport.sent == []
+    assert listener._recent == {}
+    protocol.datagram_received(good, (lan.host, 54321))
+    assert len(seen) == 1
+
+
+@pytest.mark.parametrize('packet', [b'Z' * 32, hello_reply(device_id=0), hello_reply(device_id=0xffffffff)])
+def test_invalid_hello_cannot_change_handshake(listener, lan, packet):
+    lan.device_id = None
+    lan.delta_ts = None
+    listener.on_datagram(packet, (lan.host, 54321))
+    assert lan.device_id is None
+    assert lan.delta_ts is None
+    assert listener._transport.sent == []
+
+
+@pytest.mark.parametrize('token', ['00' * 12, '00' * 17, 'not hex'])
+def test_reject_invalid_token_length(lan, token):
+    with pytest.raises(ValueError):
+        LanDevice(lan.device, lan.host, token)
+
+
+@pytest.mark.parametrize('result', [None, [], True, {'code': False}, {'code': '0'}])
+def test_malformed_subscription_response_does_not_change_state(listener, lan, result):
+    lan.sub_id = 42
+    listener.on_datagram(lan.frame({'id': 42, 'result': result}), (lan.host, 54321))
+    assert not lan.subscribed
+    assert listener._transport.sent == []
+
+
+def test_subscription_response_is_not_acknowledged(listener, lan):
+    lan.sub_id = 42
+    listener.on_datagram(lan.frame({'id': 42, 'result': {'code': 0}}), (lan.host, 54321))
+    assert lan.subscribed
+    assert listener._transport.sent == []
+
+
+@pytest.mark.parametrize('params', [None, [], [None], {'siid': True, 'eiid': 1}, {'siid': 2, 'eiid': '1'}])
+def test_invalid_uplink_does_not_affect_dedup(listener, lan, params):
+    listener.on_datagram(lan.frame({'id': 7, 'method': 'event_occured', 'params': params}), (lan.host, 54321))
+    assert listener._recent == {}
+    assert listener._transport.sent == []
