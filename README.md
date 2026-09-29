@@ -6,6 +6,25 @@
 
 # Xiaomi Miot For HomeAssistant
 
+## Oliver's fork
+
+This fork is maintained at [oliver-mee/hass-xiaomi-miot](https://github.com/oliver-mee/hass-xiaomi-miot), with releases from `deploy`.
+In HACS, add that repository as a custom integration repository and update the
+fork's **Xiaomi Miot** entry. Check the repository owner before downloading;
+installing the community upstream replaces the fork's additional features.
+Use a tagged release, take a full HA backup, install through HACS, then restart HA.
+
+Version 1.1.9 separates MiHome message and scene-history sensors by account,
+region and service. Existing registry entries migrate in place so their entity
+IDs and customisations remain. A second region previously hidden by a collision
+can gain new sensors. Rolling back this migration requires the matching HA
+backup as well as the older integration version. The release also validates
+code-less write acknowledgements, retains XiaoAI state on malformed responses,
+and fixes legacy entity-ID domains for future HA compatibility.
+
+The sections below describe the community upstream. Its installation links
+point to `al-one`, rather than this fork.
+
 English | [简体中文](https://github.com/al-one/hass-xiaomi-miot/blob/master/README_zh.md)
 
 [MIoT-Spec](https://iot.mi.com/new/doc/design/spec/overall): The protocol specification for Xiaomi IoT devices, is a standard designed by the Xiaomi IoT platform to describe the function definition of hardware products according to the networking mode of hardware products, the characteristics of product functions, the characteristics of user usage scenarios and the user's requirements for hardware product use experience specification.
