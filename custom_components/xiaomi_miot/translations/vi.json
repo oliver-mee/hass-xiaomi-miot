@@ -75,7 +75,7 @@
             },
             "reauth_verify": {
                 "title": "Xác thực lại Xiaomi — nhập mã xác minh",
-                "description": "Mở [liên kết này]({verify_url}) trong trình duyệt, yêu cầu mã rồi dán mã xác minh vào đây.",
+                "description": "Để xác minh qua email, hãy nhập mã được gửi đến email của bạn. Với các phương thức khác, mở [liên kết này]({verify_url}) và hoàn tất xác minh.",
                 "data": {
                     "verify_ticket": "Mã xác minh"
                 }

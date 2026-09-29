@@ -66,7 +66,7 @@
             },
             "reauth_verify": {
                 "title": "Ponowne uwierzytelnienie Xiaomi — wpisz kod weryfikacyjny",
-                "description": "Otwórz [ten link]({verify_url}) w przeglądarce, poproś o kod, a następnie wklej tutaj kod weryfikacyjny.",
+                "description": "W przypadku weryfikacji e-mail wpisz kod wysłany na Twój adres e-mail. W przypadku innych metod otwórz [ten link]({verify_url}) i dokończ weryfikację.",
                 "data": {
                     "verify_ticket": "Kod weryfikacyjny"
                 }

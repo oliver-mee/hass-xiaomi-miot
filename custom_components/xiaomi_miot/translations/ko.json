@@ -75,7 +75,7 @@
             },
             "reauth_verify": {
                 "title": "샤오미 재인증 — 인증 코드 입력",
-                "description": "브라우저에서 [이 링크]({verify_url})를 열어 코드를 요청한 다음, 인증 티켓을 여기에 붙여넣으세요.",
+                "description": "이메일 인증은 이메일로 받은 코드를 입력하세요. 다른 인증 방법은 [이 링크]({verify_url})를 열어 인증을 완료하세요.",
                 "data": {
                     "verify_ticket": "인증 티켓"
                 }
