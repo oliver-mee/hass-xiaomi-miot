@@ -14,6 +14,19 @@ fork's **Xiaomi Miot** entry. Check the repository owner before downloading;
 installing the community upstream replaces the fork's additional features.
 Use a tagged release, take a full HA backup, install through HACS, then restart HA.
 
+Version 1.2.0 adds live HLS/RTSP support for converter-based cameras with the
+corresponding MIoT services, including C701, and account/region/home-scoped
+manual-scene buttons. Scenes run only when pressed. Live URLs are cached per
+camera, refreshed before expiry, and excluded from entity attributes. Actual
+playback depends on device firmware and Xiaomi's stream availability.
+
+Email-only verification now requests a code in the same session used to check
+it. Discovery retains cached devices on transient or malformed responses and
+keeps home ownership for shared devices. Energy statistics distinguish missing
+readings from zero and restore scaled values without scaling them twice.
+No synthetic midnight reset or heuristic suppression of genuine decreases is
+applied. The speculative phone-code delivery endpoint is not implemented.
+
 Version 1.1.9 separates MiHome message and scene-history sensors by account,
 region and service. Existing registry entries migrate in place so their entity
 IDs and customisations remain. A second region previously hidden by a collision
