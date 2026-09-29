@@ -248,6 +248,7 @@ class MiotSensorEntity(MiotEntity, BaseEntity):
     def device_class(self):
         """Return the class of this entity."""
         return self.get_device_class(SensorDeviceClass)
+    _entity_domain = ENTITY_DOMAIN
 
     @property
     def native_value(self):
