@@ -1,5 +1,7 @@
 import hashlib
 import json
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -8,6 +10,9 @@ from custom_components.xiaomi_miot.core.miot_lan import (
     LanDevice,
     MiotLanListener,
 )
+from custom_components.xiaomi_miot.core.const import DOMAIN
+from custom_components.xiaomi_miot.core.device import MiotDevice
+from custom_components.xiaomi_miot.core.hass_entry import HassEntry
 
 TOKEN = '00112233445566778899aabbccddeeff'
 
@@ -209,3 +214,121 @@ def test_cloud_dispatch_defers_to_lan(make_device, load_miot_spec, hass, lan):
     })
 
     assert handled is False
+
+
+@pytest.fixture
+async def refreshable_device(hass, lan, listener):
+    device = lan.device
+    device.cloud = SimpleNamespace(user_id='test-user')
+    device.local = MiotDevice.from_device(device)
+    device.entry.get_cloud_device = AsyncMock()
+    lan.subscribed = True
+    hass.data[DOMAIN]['lan_listener'] = listener
+    yield device
+    await listener.async_stop()
+
+
+@pytest.mark.parametrize('updates', [
+    {'localip': '192.168.2.5'},
+    {'token': '11' * 16},
+    {'localip': '192.168.2.5', 'token': '11' * 16},
+])
+async def test_local_refresh_resubscribes_lan_and_allows_cloud_until_ready(
+    refreshable_device, listener, lan, updates,
+):
+    device = refreshable_device
+    device.entry.get_cloud_device.return_value = updates
+    seen = []
+    device.add_listener(lambda data, only_info=False: seen.append(data))
+    entry = HassEntry.__new__(HassEntry)
+    entry.devices = {'unique': device}
+    entry.did_to_unique = {device.info.did: 'unique'}
+    message = {
+        'did': device.info.did,
+        'params': {'body': {'event': 'paper_jammed', 'arguments': [7, 1]}},
+    }
+
+    assert await device.async_refresh_local_device() is True
+    replacement = listener.devices[lan.did]
+    assert replacement is not lan
+    assert replacement.host == device.info.host
+    assert replacement.token == bytes.fromhex(device.info.token)
+    assert listener._by_host == {device.info.host: replacement}
+    assert listener._transport.sent == [(HELLO, (device.info.host, 54321))]
+    assert replacement.subscribed is False
+    assert entry.dispatch_device_event(message) is True
+
+    # Complete the new handshake and subscription with the refreshed token.
+    listener.on_datagram(hello_reply(), (replacement.host, 54321))
+    listener.on_datagram(replacement.frame({
+        'id': replacement.sub_id, 'result': {'code': 0},
+    }), (replacement.host, 54321))
+    assert replacement.subscribed is True
+    assert entry.dispatch_device_event(message) is False
+    listener.on_datagram(replacement.frame({
+        'id': 77, 'method': 'event_occured',
+        'params': {'did': lan.did, 'siid': 2, 'eiid': 2, 'arguments': [7, 1]},
+    }), (replacement.host, 54321))
+    events = [data for data in seen if 'event.printer.paper_jammed' in data]
+    assert len(events) == 2  # One cloud occurrence, then one LAN occurrence.
+
+
+@pytest.mark.parametrize('cloud_info', [
+    {},
+    {'localip': '192.168.2.4', 'token': TOKEN},
+    {'localip': '0.0.0.0'},
+])
+async def test_unsuccessful_local_refresh_keeps_lan_registration(
+    refreshable_device, listener, lan, cloud_info,
+):
+    device = refreshable_device
+    old_local = device.local
+    device.entry.get_cloud_device.return_value = cloud_info
+
+    assert await device.async_refresh_local_device() is False
+    assert device.local is old_local
+    assert listener.devices[lan.did] is lan
+    assert listener._by_host == {lan.host: lan}
+    assert lan.subscribed is True
+    assert listener._transport.sent == []
+
+
+async def test_cloud_refresh_error_keeps_lan_registration(refreshable_device, listener, lan):
+    device = refreshable_device
+    device.entry.get_cloud_device.side_effect = OSError('cloud unavailable')
+
+    with pytest.raises(OSError, match='cloud unavailable'):
+        await device.async_refresh_local_device()
+    assert listener.devices[lan.did] is lan
+    assert lan.subscribed is True
+    assert listener._transport.sent == []
+
+
+async def test_lan_restart_failure_does_not_undo_local_refresh(
+    refreshable_device, listener, lan, monkeypatch,
+):
+    device = refreshable_device
+    device.entry.get_cloud_device.return_value = {'localip': '192.168.2.5'}
+    monkeypatch.setattr(listener, 'async_add_device', AsyncMock(side_effect=OSError('socket failed')))
+
+    assert await device.async_refresh_local_device() is True
+    assert device.local.host == '192.168.2.5'
+    assert lan.did not in listener.devices
+    assert lan.host not in listener._by_host
+    assert HassEntry.lan_subscribed(device) is False
+
+
+@pytest.mark.parametrize('has_listener', [False, True])
+async def test_local_refresh_does_not_enable_lan_events(
+    refreshable_device, listener, lan, hass, has_listener,
+):
+    device = refreshable_device
+    listener.async_remove_device(lan.did)
+    if not has_listener:
+        hass.data[DOMAIN].pop('lan_listener')
+    device.entry.get_cloud_device.return_value = {'localip': '192.168.2.5'}
+
+    assert await device.async_refresh_local_device() is True
+    assert listener.devices == {}
+    assert listener._transport.sent == []
+    assert ('lan_listener' in hass.data[DOMAIN]) is has_listener
