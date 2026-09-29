@@ -1260,6 +1260,37 @@ class MiotResults:
         if results:
             self.set_results(results)
 
+    @classmethod
+    def from_write(cls, results, params):
+        """Accept code-less property echoes only when they acknowledge this write.
+
+        Some local devices echo the requested property/value without a status
+        code. Read responses must still carry their normal status codes.
+        """
+        if not isinstance(results, list):
+            return cls([{'code': -1, 'error': 'Invalid write response'}])
+        normalised = []
+        for result in results:
+            if not isinstance(result, dict):
+                # Preserve the older miio acknowledgements used by converters.
+                if result is None or result == 'ok':
+                    normalised.append(result)
+                else:
+                    normalised.append({'code': -1, 'error': 'Invalid write response'})
+                continue
+            result = dict(result)
+            if result.get('error') is not None:
+                result['code'] = -1
+            elif 'code' not in result and all(k in result for k in ('siid', 'piid', 'value')):
+                if any(
+                    all(k in param and result[k] == param[k] for k in ('siid', 'piid', 'value'))
+                    and ('did' not in result or str(result['did']) == str(param.get('did')))
+                    for param in params
+                ):
+                    result['code'] = 0
+            normalised.append(result)
+        return cls(normalised)
+
     def set_results(self, results, mapping=None):
         if mapping:
             self.mapping = mapping
