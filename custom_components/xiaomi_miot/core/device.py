@@ -255,6 +255,16 @@ class Device(CustomConfigHelper):
         self.local = local
         self._local_fails = 0
         self._local_state = None
+        listener = self.hass.data.get(DOMAIN, {}).get('lan_listener')
+        if listener and self.info.did in listener.devices:
+            # The listener caches the address and token separately from the
+            # polling client. Reset its subscription so cloud events can fill
+            # the gap until the new LAN handshake succeeds.
+            listener.async_remove_device(self.info.did)
+            try:
+                await listener.async_add_device(self)
+            except Exception as exc:  # noqa: BLE001 - polling can still recover
+                self.log.warning('%s: Failed to restart LAN events: %s', self.name, exc)
         self.log.warning(
             '%s: Refreshed local connection after address or token changed: %s -> %s',
             self.name,
