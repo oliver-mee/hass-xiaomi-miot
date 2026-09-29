@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from functools import cmp_to_key, cached_property
 
 from homeassistant.const import STATE_UNKNOWN
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.components.sensor import (
     DOMAIN as ENTITY_DOMAIN,
     SensorEntity as BaseEntity,
@@ -14,6 +15,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.helpers.restore_state import RestoreEntity, RestoredExtraData
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from . import (
@@ -33,7 +35,7 @@ from .core.miot_spec import (
     MiotSpec,
     MiotService,
 )
-from .core.utils import local_zone, get_translation
+from .core.utils import local_zone, get_translation, slugify_object_id
 
 _LOGGER = logging.getLogger(__name__)
 DATA_KEY = f'{ENTITY_DOMAIN}.{DOMAIN}'
@@ -41,33 +43,93 @@ DATA_KEY = f'{ENTITY_DOMAIN}.{DOMAIN}'
 SERVICE_TO_METHOD = {}
 
 
+def _migrate_legacy_entity(hass, config_entry_id, old_unique_id, new_unique_id):
+    """Migrate one legacy MiHome sensor ID owned by this config entry.
+
+    Entity registry metadata, including a user-selected entity ID and name, is
+    retained by changing only the unique ID.  An entry belonging to another
+    config entry must never be claimed while fixing a regional collision.
+    """
+    if not config_entry_id or old_unique_id == new_unique_id:
+        return None
+
+    registry = er.async_get(hass)
+    old_entity_id = registry.async_get_entity_id(ENTITY_DOMAIN, DOMAIN, old_unique_id)
+    existing_entity_id = registry.async_get_entity_id(ENTITY_DOMAIN, DOMAIN, new_unique_id)
+    if existing_entity_id:
+        existing_entry = registry.async_get(existing_entity_id)
+        if existing_entry and existing_entry.config_entry_id == config_entry_id:
+            return existing_entry.entity_id
+        raise HomeAssistantError(
+            f'Cannot claim Xiaomi sensor {new_unique_id}: '
+            'the entity registry target belongs to another config entry'
+        )
+
+    if not old_entity_id:
+        return None
+    old_entry = registry.async_get(old_entity_id)
+    if not old_entry or old_entry.config_entry_id != config_entry_id or old_entry.platform != DOMAIN:
+        return None
+
+    registry.async_update_entity(old_entry.entity_id, new_unique_id=new_unique_id)
+    return old_entry.entity_id
+
+
 async def async_setup_entry(hass, config_entry, async_add_entities):
     entry = HassEntry.init(hass, config_entry).new_adder(ENTITY_DOMAIN, async_add_entities)
     cloud = await entry.get_cloud()
+    release = None
 
     if cloud:
-        if not entry.get_config('disable_message'):
-            hass.data[DOMAIN]['accounts'].setdefault(cloud.user_id, {})
+        account_key = cloud.unique_id
+        account = hass.data[DOMAIN]['accounts'].setdefault(account_key, {})
+        reserved = {}
 
-            if not hass.data[DOMAIN]['accounts'][cloud.user_id].get('messenger'):
-                entity = MihomeMessageSensor(hass, cloud)
-                await entity.coordinator.async_config_entry_first_refresh()
-                hass.data[DOMAIN]['accounts'][cloud.user_id]['messenger'] = entity
-                async_add_entities([entity], update_before_add=False)
+        def release_reservations():
+            for key, entity in reserved.items():
+                if account.get(key) is entity:
+                    account.pop(key, None)
 
-        if not entry.get_config('disable_scene_history'):
-            homes = await cloud.async_get_homerooms()
-            for home in homes:
-                home_id = home.get('id')
-                if hass.data[DOMAIN]['accounts'][cloud.user_id].get(f'scene_history_{home_id}'):
-                    continue
+        release = release_reservations
+        config_entry.async_on_unload(release_reservations)
 
-                entity = MihomeSceneHistorySensor(hass, cloud, home_id, home.get('uid'))
-                await entity.coordinator.async_config_entry_first_refresh()
-                hass.data[DOMAIN]['accounts'][cloud.user_id][f'scene_history_{home_id}'] = entity
-                async_add_entities([entity], update_before_add=False)
+        try:
+            if not entry.get_config('disable_message'):
+                if not account.get('messenger'):
+                    entity = MihomeMessageSensor(hass, cloud, config_entry.entry_id)
+                    # Reserve before the first await so concurrent setup cannot
+                    # create two sensors for the same regional account.
+                    account['messenger'] = entity
+                    reserved['messenger'] = entity
+                    await entity.coordinator.async_config_entry_first_refresh()
+                    async_add_entities([entity], update_before_add=False)
 
-    await async_setup_config_entry(hass, config_entry, async_setup_platform, async_add_entities, ENTITY_DOMAIN)
+            if not entry.get_config('disable_scene_history'):
+                homes = await cloud.async_get_homerooms()
+                for home in homes:
+                    home_id = home.get('id')
+                    scene_key = f'scene_history_{home_id}'
+                    if account.get(scene_key):
+                        continue
+
+                    entity = MihomeSceneHistorySensor(
+                        hass, cloud, home_id, home.get('uid'), config_entry.entry_id,
+                    )
+                    # Reserve each home independently before its first await.
+                    account[scene_key] = entity
+                    reserved[scene_key] = entity
+                    await entity.coordinator.async_config_entry_first_refresh()
+                    async_add_entities([entity], update_before_add=False)
+        except BaseException:
+            release_reservations()
+            raise
+
+    try:
+        await async_setup_config_entry(hass, config_entry, async_setup_platform, async_add_entities, ENTITY_DOMAIN)
+    except BaseException:
+        if release:
+            release()
+        raise
 
 
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
@@ -186,6 +248,7 @@ XEntity.CLS[ENTITY_DOMAIN] = SensorEntity
 
 
 class MiotSensorEntity(MiotEntity, BaseEntity):
+    _entity_domain = ENTITY_DOMAIN
 
     def __init__(self, config, miot_service: MiotService):
         super().__init__(miot_service, config=config, logger=_LOGGER)
@@ -248,7 +311,6 @@ class MiotSensorEntity(MiotEntity, BaseEntity):
     def device_class(self):
         """Return the class of this entity."""
         return self.get_device_class(SensorDeviceClass)
-    _entity_domain = ENTITY_DOMAIN
 
     @property
     def native_value(self):
@@ -321,12 +383,21 @@ class MihomeMessageSensor(MiCoordinatorEntity, BaseEntity, RestoreEntity):
     _has_none_message = False
     _dispatched_mid = 0
 
-    def __init__(self, hass, cloud: MiotCloud):
+    def __init__(self, hass, cloud: MiotCloud, config_entry_id=None):
         self.hass = hass
         self.cloud = cloud
+        self._account_key = cloud.unique_id
+        self._config_entry_id = config_entry_id
         self.message = {}
-        self.entity_id = f'{ENTITY_DOMAIN}.mi_{cloud.user_id}_message'
-        self._attr_unique_id = f'{DOMAIN}-mihome-message-{cloud.user_id}'
+        self.entity_id = f'{ENTITY_DOMAIN}.{slugify_object_id(f"mi_{cloud.unique_id}_message")}'
+        self._attr_unique_id = f'{DOMAIN}-mihome-message-{cloud.unique_id}'
+        if migrated_entity_id := _migrate_legacy_entity(
+            hass,
+            config_entry_id,
+            f'{DOMAIN}-mihome-message-{cloud.user_id}',
+            self._attr_unique_id,
+        ):
+            self.entity_id = migrated_entity_id
         self._attr_name = f'Xiaomi {cloud.user_id} message'
         self._attr_icon = 'mdi:message'
         self._attr_should_poll = False
@@ -363,7 +434,9 @@ class MihomeMessageSensor(MiCoordinatorEntity, BaseEntity, RestoreEntity):
         To be extended by integrations.
         """
         await super().async_will_remove_from_hass()
-        self.hass.data[DOMAIN]['accounts'].get(self.cloud.user_id, {}).pop('messenger', None)
+        account = self.hass.data[DOMAIN]['accounts'].get(self._account_key, {})
+        if account.get('messenger') is self:
+            account.pop('messenger', None)
 
     @property
     def extra_restore_state_data(self):
@@ -486,14 +559,23 @@ class MihomeSceneHistorySensor(MiCoordinatorEntity, BaseEntity, RestoreEntity):
 
     _has_none_message = False
 
-    def __init__(self, hass, cloud: MiotCloud, home_id, owner_user_id):
+    def __init__(self, hass, cloud: MiotCloud, home_id, owner_user_id, config_entry_id=None):
         self.hass = hass
         self.cloud = cloud
+        self._account_key = cloud.unique_id
+        self._config_entry_id = config_entry_id
         self.home_id = int(home_id)
         self.owner_user_id = int(owner_user_id)
-        self.entity_id = f'{ENTITY_DOMAIN}.mi_{cloud.user_id}_{home_id}_scene_history'
-        self._attr_unique_id = f'{DOMAIN}-mihome-scene-history-{cloud.user_id}_{home_id}'
+        self.entity_id = f'{ENTITY_DOMAIN}.{slugify_object_id(f"mi_{cloud.unique_id}_{home_id}_scene_history")}'
+        self._attr_unique_id = f'{DOMAIN}-mihome-scene-history-{cloud.unique_id}_{home_id}'
         self._attr_name = f'Xiaomi {cloud.user_id}_{home_id} Scene History'
+        if migrated_entity_id := _migrate_legacy_entity(
+            hass,
+            config_entry_id,
+            f'{DOMAIN}-mihome-scene-history-{cloud.user_id}_{home_id}',
+            self._attr_unique_id,
+        ):
+            self.entity_id = migrated_entity_id
         self._attr_icon = 'mdi:message'
         self._attr_should_poll = False
         self._attr_native_value = None
@@ -534,7 +616,10 @@ class MihomeSceneHistorySensor(MiCoordinatorEntity, BaseEntity, RestoreEntity):
         To be extended by integrations.
         """
         await super().async_will_remove_from_hass()
-        self.hass.data[DOMAIN]['accounts'].get(self.cloud.user_id, {}).pop(f'scene_history_{self.home_id}', None)
+        account = self.hass.data[DOMAIN]['accounts'].get(self._account_key, {})
+        key = f'scene_history_{self.home_id}'
+        if account.get(key) is self:
+            account.pop(key, None)
 
     @property
     def extra_restore_state_data(self):
