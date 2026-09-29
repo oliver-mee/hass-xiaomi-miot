@@ -1,95 +1,439 @@
 {
-  "type": "urn:miot-spec-v2:device:camera:0000A01C:chuangmi.camera.079ae2:1",
-  "description": "C701 Camera",
+  "type": "urn:miot-spec-v2:device:camera:0000A01C:chuangmi-079ae2:1:0000D070",
+  "description": "chuangmi camera 079ae2",
   "services": [
     {
-      "iid": 10,
-      "type": "urn:miot-spec-v2:service:camera_stream_for_google_home:00007895:chuangmi.camera.079ae2:1",
-      "description": "Camera Stream for Google Home",
+      "iid": 29,
+      "type": "urn:miot-spec-v2:service:camera-stream-for-amazon-alexa:00007830:chuangmi-079ae2:1",
+      "description": "Camera Stream Management For Amazon Alexa",
       "properties": [
         {
           "iid": 1,
-          "type": "urn:miot-spec-v2:property:stream_address:00000100:chuangmi.camera.079ae2:1",
-          "description": "Stream Address",
-          "format": "string",
-          "access": ["read"]
+          "type": "urn:miot-spec-v2:property:video-codec-type:0000005A:chuangmi-079ae2:1",
+          "description": "Video Codec Type",
+          "format": "uint8",
+          "access": [],
+          "value-list": [
+            {
+              "value": 1,
+              "description": "H264"
+            },
+            {
+              "value": 2,
+              "description": "MPEG"
+            },
+            {
+              "value": 3,
+              "description": "MPEG2"
+            },
+            {
+              "value": 4,
+              "description": "MP4"
+            }
+          ]
         },
         {
           "iid": 2,
-          "type": "urn:miot-spec-v2:property:expiration_time:00000101:chuangmi.camera.079ae2:1",
-          "description": "Expiration Time",
-          "format": "uint64",
-          "access": ["read"]
+          "type": "urn:miot-spec-v2:property:video-attribute:0000005B:chuangmi-079ae2:1",
+          "description": "Video Attribute",
+          "format": "uint8",
+          "access": [],
+          "value-list": [
+            {
+              "value": 1,
+              "description": "1920_1080_30"
+            },
+            {
+              "value": 2,
+              "description": "1280_720_30"
+            },
+            {
+              "value": 3,
+              "description": "1024_768_30"
+            }
+          ]
         },
         {
           "iid": 3,
-          "type": "urn:miot-spec-v2:property:video_attribute:00000102:chuangmi.camera.079ae2:1",
-          "description": "Video Attribute",
+          "type": "urn:miot-spec-v2:property:audio-codec-type:0000005C:chuangmi-079ae2:1",
+          "description": "Audio Codec Type",
           "format": "uint8",
-          "access": ["read"],
+          "access": [],
           "value-list": [
-            {"value": 1, "description": "Main stream"},
-            {"value": 2, "description": "Sub stream"}
+            {
+              "value": 1,
+              "description": "PCMU"
+            },
+            {
+              "value": 2,
+              "description": "PCMA"
+            },
+            {
+              "value": 3,
+              "description": "OPUS"
+            },
+            {
+              "value": 4,
+              "description": "MSBC"
+            },
+            {
+              "value": 5,
+              "description": "AMR"
+            }
+          ]
+        },
+        {
+          "iid": 4,
+          "type": "urn:miot-spec-v2:property:audio-attribute:0000005D:chuangmi-079ae2:1",
+          "description": "Audio Attribute",
+          "format": "uint8",
+          "access": [],
+          "value-list": [
+            {
+              "value": 0,
+              "description": "Default"
+            },
+            {
+              "value": 1,
+              "description": "44100_2_16_VARIABLE"
+            },
+            {
+              "value": 2,
+              "description": "8000_1_8_CONSTANT"
+            }
+          ]
+        },
+        {
+          "iid": 5,
+          "type": "urn:miot-spec-v2:property:authorization-type:00000062:chuangmi-079ae2:1",
+          "description": "Authorization Type",
+          "format": "uint8",
+          "access": [],
+          "value-list": [
+            {
+              "value": 0,
+              "description": "None"
+            },
+            {
+              "value": 1,
+              "description": "Basic"
+            },
+            {
+              "value": 2,
+              "description": "Digest"
+            }
+          ]
+        },
+        {
+          "iid": 6,
+          "type": "urn:miot-spec-v2:property:stream-address:0000005E:chuangmi-079ae2:1",
+          "description": "Stream URL",
+          "format": "string",
+          "access": []
+        },
+        {
+          "iid": 7,
+          "type": "urn:miot-spec-v2:property:image-snapshot:00000064:chuangmi-079ae2:1",
+          "description": "Image Snapshot URL",
+          "format": "string",
+          "access": []
+        },
+        {
+          "iid": 8,
+          "type": "urn:miot-spec-v2:property:expiration-time:00000063:chuangmi-079ae2:1",
+          "description": "Expiration Time",
+          "format": "uint32",
+          "access": [],
+          "unit": "seconds",
+          "value-range": [
+            0,
+            3600,
+            3600
+          ]
+        },
+        {
+          "iid": 9,
+          "type": "urn:miot-spec-v2:property:stream-status:00000059:chuangmi-079ae2:1",
+          "description": "Stream Status",
+          "format": "uint8",
+          "access": [
+            "read",
+            "notify"
+          ],
+          "value-list": [
+            {
+              "value": 1,
+              "description": "Available"
+            },
+            {
+              "value": 2,
+              "description": "In use"
+            },
+            {
+              "value": 3,
+              "description": "Unavailable"
+            }
+          ]
+        },
+        {
+          "iid": 10,
+          "type": "urn:miot-spec-v2:property:session-id:000001DA:chuangmi-079ae2:1",
+          "description": "Session Id",
+          "format": "string",
+          "access": []
+        },
+        {
+          "iid": 11,
+          "type": "urn:miot-spec-v2:property:webrtc-offer:000001DB:chuangmi-079ae2:1",
+          "description": "Webrtc Offer",
+          "format": "string",
+          "access": []
+        },
+        {
+          "iid": 12,
+          "type": "urn:miot-spec-v2:property:param-sleep-status:000003B2:chuangmi-079ae2:1",
+          "description": "Param Sleep Status",
+          "format": "bool",
+          "access": []
+        },
+        {
+          "iid": 13,
+          "type": "urn:miot-spec-v2:property:camera-index:00000423:chuangmi-079ae2:1",
+          "description": "Camera Index",
+          "format": "uint8",
+          "access": [],
+          "value-range": [
+            0,
+            10,
+            1
           ]
         }
       ],
       "actions": [
         {
           "iid": 1,
-          "type": "urn:miot-spec-v2:action:start_hls_stream:00002805:chuangmi.camera.079ae2:1",
-          "description": "Start HLS Stream",
-          "in": [3],
-          "out": [1, 2]
+          "type": "urn:miot-spec-v2:action:get-stream-configuration:00002823:chuangmi-079ae2:1",
+          "description": "Get Stream Configuration of Camera",
+          "in": [],
+          "out": [
+            9,
+            1,
+            2,
+            3,
+            4
+          ]
         },
         {
           "iid": 2,
-          "type": "urn:miot-spec-v2:action:stop_stream:00002806:chuangmi.camera.079ae2:1",
-          "description": "Stop Stream",
+          "type": "urn:miot-spec-v2:action:start-rtsp-stream:00002820:chuangmi-079ae2:1",
+          "description": "Start Camera Stream for Alexa",
+          "in": [
+            2
+          ],
+          "out": [
+            6,
+            7,
+            8
+          ]
+        },
+        {
+          "iid": 3,
+          "type": "urn:miot-spec-v2:action:stop-stream:00002822:chuangmi-079ae2:1",
+          "description": "Stop Camera Stream",
           "in": [],
           "out": []
         }
       ]
     },
     {
-      "iid": 11,
-      "type": "urn:miot-spec-v2:service:camera_stream_for_amazon_alexa:00007895:chuangmi.camera.079ae2:1",
-      "description": "Camera Stream for Amazon Alexa",
+      "iid": 28,
+      "type": "urn:miot-spec-v2:service:camera-stream-for-google-home:00007831:chuangmi-079ae2:1",
+      "description": "Camera Stream Management For Google Home",
       "properties": [
         {
           "iid": 1,
-          "type": "urn:miot-spec-v2:property:stream_address:00000100:chuangmi.camera.079ae2:1",
-          "description": "Stream Address",
-          "format": "string",
-          "access": ["read"]
+          "type": "urn:miot-spec-v2:property:video-codec-type:0000005A:chuangmi-079ae2:1",
+          "description": "Video Codec Type",
+          "format": "uint8",
+          "access": [],
+          "value-list": [
+            {
+              "value": 1,
+              "description": "H264"
+            },
+            {
+              "value": 2,
+              "description": "MPEG"
+            },
+            {
+              "value": 3,
+              "description": "MPEG2"
+            },
+            {
+              "value": 4,
+              "description": "MP4"
+            }
+          ]
         },
         {
           "iid": 2,
-          "type": "urn:miot-spec-v2:property:expiration_time:00000101:chuangmi.camera.079ae2:1",
-          "description": "Expiration Time",
-          "format": "uint64",
-          "access": ["read"]
+          "type": "urn:miot-spec-v2:property:video-attribute:0000005B:chuangmi-079ae2:1",
+          "description": "Video Attribute",
+          "format": "uint8",
+          "access": [],
+          "value-list": [
+            {
+              "value": 1,
+              "description": "1920_1080_30"
+            },
+            {
+              "value": 2,
+              "description": "1280_720_30"
+            },
+            {
+              "value": 3,
+              "description": "1024_768_30"
+            }
+          ]
         },
         {
           "iid": 3,
-          "type": "urn:miot-spec-v2:property:video_attribute:00000102:chuangmi.camera.079ae2:1",
-          "description": "Video Attribute",
+          "type": "urn:miot-spec-v2:property:audio-codec-type:0000005C:chuangmi-079ae2:1",
+          "description": "Audio Codec Type",
           "format": "uint8",
-          "access": ["read"],
-          "value-list": [{"value": 2, "description": "RTSP stream"}]
+          "access": [],
+          "value-list": [
+            {
+              "value": 1,
+              "description": "PCMU"
+            },
+            {
+              "value": 2,
+              "description": "PCMA"
+            },
+            {
+              "value": 3,
+              "description": "OPUS"
+            },
+            {
+              "value": 4,
+              "description": "MSBC"
+            },
+            {
+              "value": 5,
+              "description": "AMR"
+            }
+          ]
+        },
+        {
+          "iid": 4,
+          "type": "urn:miot-spec-v2:property:audio-attribute:0000005D:chuangmi-079ae2:1",
+          "description": "Audio Attribute",
+          "format": "uint8",
+          "access": [],
+          "value-list": [
+            {
+              "value": 0,
+              "description": "Default"
+            },
+            {
+              "value": 1,
+              "description": "44100_2_16_VARIABLE"
+            },
+            {
+              "value": 2,
+              "description": "8000_1_8_CONSTANT"
+            }
+          ]
+        },
+        {
+          "iid": 5,
+          "type": "urn:miot-spec-v2:property:stream-address:0000005E:chuangmi-079ae2:1",
+          "description": "Stream URL",
+          "format": "string",
+          "access": []
+        },
+        {
+          "iid": 6,
+          "type": "urn:miot-spec-v2:property:stream-receiver-id:00000060:chuangmi-079ae2:1",
+          "description": "Stream Receiver id",
+          "format": "string",
+          "access": []
+        },
+        {
+          "iid": 7,
+          "type": "urn:miot-spec-v2:property:stream-auth-token:00000061:chuangmi-079ae2:1",
+          "description": "Stream Auth Token",
+          "format": "string",
+          "access": []
+        },
+        {
+          "iid": 8,
+          "type": "urn:miot-spec-v2:property:expiration-time:00000063:chuangmi-079ae2:1",
+          "description": "Expiration Time",
+          "format": "uint32",
+          "access": [],
+          "unit": "seconds",
+          "value-range": [
+            0,
+            3600,
+            3600
+          ]
+        },
+        {
+          "iid": 9,
+          "type": "urn:miot-spec-v2:property:stream-status:00000059:chuangmi-079ae2:1",
+          "description": "Stream Status",
+          "format": "uint8",
+          "access": [
+            "read",
+            "notify"
+          ],
+          "value-list": [
+            {
+              "value": 1,
+              "description": "Available"
+            },
+            {
+              "value": 2,
+              "description": "In use"
+            },
+            {
+              "value": 3,
+              "description": "Unavailable"
+            }
+          ]
         }
       ],
       "actions": [
         {
           "iid": 1,
-          "type": "urn:miot-spec-v2:action:start_rtsp_stream:00002805:chuangmi.camera.079ae2:1",
-          "description": "Start RTSP Stream",
-          "in": [3],
-          "out": [1, 2]
+          "type": "urn:miot-spec-v2:action:get-stream-configuration:00002823:chuangmi-079ae2:1",
+          "description": "Get Stream Configuration of Camera",
+          "in": [],
+          "out": [
+            9,
+            1,
+            2,
+            3,
+            4
+          ]
         },
         {
-          "iid": 2,
-          "type": "urn:miot-spec-v2:action:stop_stream:00002806:chuangmi.camera.079ae2:1",
-          "description": "Stop Stream",
+          "iid": 3,
+          "type": "urn:miot-spec-v2:action:start-hls-stream:00002821:chuangmi-079ae2:1",
+          "description": "Start Camera Stream for Google",
+          "in": [
+            2
+          ],
+          "out": [
+            5
+          ]
+        },
+        {
+          "iid": 4,
+          "type": "urn:miot-spec-v2:action:stop-stream:00002822:chuangmi-079ae2:1",
+          "description": "Stop Camera Stream",
           "in": [],
           "out": []
         }
