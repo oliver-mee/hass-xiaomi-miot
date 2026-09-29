@@ -1,5 +1,6 @@
 import hashlib
 import json
+import time
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -99,6 +100,7 @@ def test_handshake_then_subscribe(listener, lan):
 
 def test_subscribe_reply_marks_subscribed(listener, lan):
     lan.sub_id = 42
+    lan.pending_since = time.monotonic()
     listener.on_datagram(lan.frame({'id': 42, 'result': {'code': 0}}), (lan.host, 54321))
 
     assert lan.subscribed is True
@@ -106,6 +108,7 @@ def test_subscribe_reply_marks_subscribed(listener, lan):
 
 def test_subscribe_failure_is_not_treated_as_success(listener, lan):
     lan.sub_id = 42
+    lan.pending_since = time.monotonic()
     listener.on_datagram(lan.frame({'id': 42, 'result': {'code': -1}}), (lan.host, 54321))
 
     assert lan.subscribed is False
@@ -383,6 +386,7 @@ def test_reject_invalid_token_length(lan, token):
 @pytest.mark.parametrize('result', [None, [], True, {'code': False}, {'code': '0'}])
 def test_malformed_subscription_response_does_not_change_state(listener, lan, result):
     lan.sub_id = 42
+    lan.pending_since = time.monotonic()
     listener.on_datagram(lan.frame({'id': 42, 'result': result}), (lan.host, 54321))
     assert not lan.subscribed
     assert listener._transport.sent == []
@@ -390,6 +394,7 @@ def test_malformed_subscription_response_does_not_change_state(listener, lan, re
 
 def test_subscription_response_is_not_acknowledged(listener, lan):
     lan.sub_id = 42
+    lan.pending_since = time.monotonic()
     listener.on_datagram(lan.frame({'id': 42, 'result': {'code': 0}}), (lan.host, 54321))
     assert lan.subscribed
     assert listener._transport.sent == []
@@ -400,3 +405,85 @@ def test_invalid_uplink_does_not_affect_dedup(listener, lan, params):
     listener.on_datagram(lan.frame({'id': 7, 'method': 'event_occured', 'params': params}), (lan.host, 54321))
     assert listener._recent == {}
     assert listener._transport.sent == []
+
+
+@pytest.fixture
+def monotonic(monkeypatch):
+    clock = [1000.0]
+    monkeypatch.setattr('custom_components.xiaomi_miot.core.miot_lan.time.monotonic', lambda: clock[0])
+    return clock
+
+
+def subscription_reply(listener, lan, code=0, request_id=None):
+    listener.on_datagram(lan.frame({'id': lan.sub_id if request_id is None else request_id,
+                                   'result': {'code': code}}), (lan.host, 54321))
+
+
+@pytest.mark.parametrize('failure', ['lost', 'rejected'])
+async def test_initial_subscription_retries_and_recovers(listener, lan, monotonic, failure):
+    lan.last_seen = monotonic[0]
+    listener._maybe_subscribe(lan, monotonic[0])
+    first_id = lan.sub_id
+    if failure == 'rejected':
+        subscription_reply(listener, lan, -1)
+    monotonic[0] += 24
+    await listener._keepalive()
+    assert lan.last_attempt == 1000
+    monotonic[0] += 1
+    await listener._keepalive()
+    assert lan.sub_id != first_id
+    assert lan.pending_since == 1025
+    subscription_reply(listener, lan, request_id=first_id)
+    assert not lan.subscribed
+    subscription_reply(listener, lan)
+    assert lan.subscribed
+    assert lan.pending_since is None
+
+
+async def test_renewal_timeout_enables_cloud_fallback(listener, lan, monotonic, hass):
+    hass.data[DOMAIN]['lan_listener'] = listener
+    lan.last_seen = monotonic[0]
+    listener._maybe_subscribe(lan, monotonic[0])
+    subscription_reply(listener, lan)
+    assert HassEntry.lan_subscribed(lan.device)
+    monotonic[0] += 300
+    listener.on_datagram(hello_reply(), (lan.host, 54321))
+    pending = lan.sub_id
+    assert pending is not None
+    monotonic[0] += 25
+    await listener._keepalive()
+    assert not HassEntry.lan_subscribed(lan.device)
+    assert lan.sub_id != pending
+    subscription_reply(listener, lan)
+    assert HassEntry.lan_subscribed(lan.device)
+
+
+async def test_silent_device_expires_then_reconnects(listener, lan, monotonic):
+    lan.last_seen = monotonic[0]
+    listener._maybe_subscribe(lan, monotonic[0])
+    subscription_reply(listener, lan)
+    monotonic[0] += 75
+    await listener._keepalive()
+    assert not lan.subscribed
+    assert lan.pending_since is None
+    listener.on_datagram(hello_reply(), (lan.host, 54321))
+    subscription_reply(listener, lan)
+    assert lan.subscribed
+
+
+async def test_socket_send_error_does_not_abort_keepalive(listener, lan, monotonic, monkeypatch):
+    lan.last_seen = monotonic[0]
+    monkeypatch.setattr(listener._transport, 'sendto', lambda *args: (_ for _ in ()).throw(OSError('offline')))
+    await listener._keepalive()
+    monotonic[0] += 25
+    await listener._keepalive()
+    assert not lan.subscribed
+
+
+def test_late_subscription_reply_cannot_restore_state(listener, lan, monotonic):
+    lan.last_seen = monotonic[0]
+    listener._maybe_subscribe(lan, monotonic[0])
+    monotonic[0] += 25
+    subscription_reply(listener, lan)
+    assert not lan.subscribed
+    assert lan.pending_since is None
