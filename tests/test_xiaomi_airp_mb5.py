@@ -2,6 +2,7 @@ from homeassistant.helpers.entity import EntityCategory
 
 from custom_components.xiaomi_miot.sensor import SensorEntity
 from custom_components.xiaomi_miot.core.miot_local_devices import MIOT_LOCAL_MODELS
+from custom_components.xiaomi_miot.core.device_customizes import DEVICE_CUSTOMIZES
 
 
 MODEL = "xiaomi.airp.mb5"
@@ -65,3 +66,18 @@ def test_xiaomi_airp_mb5_omits_factory_and_debug_properties(make_device, load_mi
     assert "custom_service.favorite_square" not in mapping
     motor_rpm = device.spec.get_property("motor_rpm_feedback")
     assert motor_rpm.full_name in mapping
+
+
+def test_generic_fallback_preserves_upstream_airp_mappings(make_device, load_miot_spec):
+    spec = load_miot_spec(f"{MODEL}.json")
+    curated = make_device(spec, model=MODEL)
+    extended = make_device(spec, model=MODEL, customizes={
+        **DEVICE_CUSTOMIZES[MODEL], "generic_entities": True,
+    })
+    converters = {converter.full_name: converter for converter in extended.converters}
+
+    for converter in curated.converters:
+        assert type(converters[converter.full_name]) is type(converter)
+        assert sum(c.full_name == converter.full_name for c in extended.converters) == 1
+    assert "number.aqi.aqi_updata_heartbeat" not in converters
+    assert "sensor.custom_service.favorite_square" not in converters
