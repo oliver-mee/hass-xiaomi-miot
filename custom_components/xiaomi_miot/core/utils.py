@@ -8,6 +8,7 @@ import tzlocal
 import logging
 import fnmatch
 import voluptuous as vol
+import math
 from typing import Type, Tuple, Optional, Callable, Set
 from functools import wraps
 from homeassistant.core import HomeAssistant, split_entity_id  # noqa
@@ -19,6 +20,27 @@ import homeassistant.helpers.config_validation as cv
 
 from .const import DOMAIN, DEVICE_CUSTOMIZES, DATA_CUSTOMIZE
 from .translation_languages import TRANSLATION_LANGUAGES
+
+POWER_COST_PATTERN = re.compile(r'(?:^|\.)(power_cost_(today|month)(?:_\d+)?)$')
+
+
+def normalize_power_cost_value(value) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return None
+    return value if math.isfinite(value) and value >= 0 else None
+
+
+def filter_power_cost_statistics(attrs: dict) -> dict:
+    return {
+        key: value
+        for key, value in attrs.items()
+        if not POWER_COST_PATTERN.search(key)
+        or normalize_power_cost_value(value) is not None
+    }
 
 
 def get_value(obj, key, def_value=None, sep='.'):

@@ -35,7 +35,13 @@ from .core.miot_spec import (
     MiotSpec,
     MiotService,
 )
-from .core.utils import local_zone, get_translation, slugify_object_id
+from .core.utils import (
+    POWER_COST_PATTERN,
+    get_translation,
+    local_zone,
+    normalize_power_cost_value,
+    slugify_object_id,
+)
 
 _LOGGER = logging.getLogger(__name__)
 DATA_KEY = f'{ENTITY_DOMAIN}.{DOMAIN}'
@@ -221,12 +227,32 @@ class SensorEntity(XEntity, BaseEntity, RestoreEntity):
     def get_state(self) -> dict:
         return {self.attr: self._attr_native_value}
 
+    async def async_added_to_hass(self):
+        # XEntity restores get_state(), which contains the already scaled value.
+        self._restoring_power_cost_state = True
+        try:
+            await super().async_added_to_hass()
+        finally:
+            self._restoring_power_cost_state = False
+
     def set_state(self, data: dict):
         value = self.conv.value_from_dict(data)
         prop = self._miot_property
         if prop and prop.value_range:
             if not prop.range_valid(value):
                 value = None
+        if POWER_COST_PATTERN.search(self.attr):
+            value = normalize_power_cost_value(value)
+            if value is None:
+                return
+            if not getattr(self, '_restoring_power_cost_state', False):
+                if ratio := self.custom_value_ratio:
+                    value = normalize_power_cost_value(value * ratio)
+                    if value is None:
+                        return
+            self._attr_native_value = round(value, 3)
+            return
+
         if value is not None:
             try:
                 if ratio := self.custom_value_ratio:

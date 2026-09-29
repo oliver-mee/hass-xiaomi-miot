@@ -94,3 +94,51 @@ async def test_verify_ticket_pins_trust_false_and_payload(hass):
     assert captured["data"]["_flag"] == 4
     assert captured["data"]["_json"] == "true"
     assert captured["cookies"]["identity_session"] == "IS"
+
+async def test_email_challenge_reuses_session_and_sends_once(hass):
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+    c = _cloud(hass)
+    c.attrs['verify_url'] = 'https://account.xiaomi.com/fe/service/identity/authStart?sid=xiaomiio'
+    c.account_get = Mock(return_value=SimpleNamespace(
+        cookies={'identity_session': 'same-session'}, text='{"options":[8]}'))
+    c.account_post = Mock(side_effect=[{'code': 0}, {'code': 70014}, {'code': 0}])
+    assert await hass.async_add_executor_job(c.prepare_email_verification)
+    assert await hass.async_add_executor_job(c.prepare_email_verification)
+    with pytest.raises(MiCloudVerificationError):
+        await hass.async_add_executor_job(c.verify_ticket, 'wrong')
+    await hass.async_add_executor_job(c.verify_ticket, 'right')
+    c.account_get.assert_called_once()
+    assert [call.args[0] for call in c.account_post.call_args_list] == [
+        '/identity/auth/sendEmailTicket', '/identity/auth/verifyEmail', '/identity/auth/verifyEmail',
+    ]
+    assert all(call.kwargs['cookies']['identity_session'] == 'same-session'
+               for call in c.account_post.call_args_list)
+    assert 'identity_session' not in c.attrs
+
+
+async def test_phone_delivery_is_not_inferred(hass):
+    from unittest.mock import Mock
+    c = _cloud(hass)
+    c.attrs['verify_url'] = 'https://account.xiaomi.com/fe/service/identity/authStart'
+    c.check_identity_list = Mock(return_value=[4])
+    c.account_post = Mock()
+    assert not await hass.async_add_executor_job(c.prepare_email_verification)
+    c.account_post.assert_not_called()
+
+
+async def test_new_challenge_url_gets_new_session(hass):
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+    c = _cloud(hass)
+    c.account_get = Mock(side_effect=[
+        SimpleNamespace(cookies={'identity_session': 'first'}, text='{"options":[8]}'),
+        SimpleNamespace(cookies={'identity_session': 'second'}, text='{"options":[8]}'),
+    ])
+    c.account_post = Mock(return_value={'code': 0})
+    for suffix in ('one', 'two'):
+        c.attrs['verify_url'] = f'https://account.xiaomi.com/fe/service/identity/authStart?challenge={suffix}'
+        await hass.async_add_executor_job(c.prepare_email_verification)
+    assert c.account_get.call_count == 2
+    assert c.account_post.call_count == 2
+    assert c.attrs['identity_session'] == 'second'

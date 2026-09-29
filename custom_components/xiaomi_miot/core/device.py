@@ -4,6 +4,7 @@ import re
 from typing import TYPE_CHECKING, Optional, Callable
 from datetime import timedelta
 from functools import cached_property
+from homeassistant.exceptions import TemplateError
 from homeassistant.core import HomeAssistant
 from homeassistant.const import CONF_HOST, CONF_TOKEN, CONF_MODEL, CONF_USERNAME, EntityCategory
 from homeassistant.util import dt
@@ -40,6 +41,8 @@ from .utils import (
     get_value,
     DeviceException,
     is_offline_exception,
+    POWER_COST_PATTERN,
+    filter_power_cost_statistics,
     update_attrs_with_suffix,
 )
 from .templates import template
@@ -1431,7 +1434,13 @@ class Device(CustomConfigHelper):
             self.log.info('Got micloud statistics: %s', rdt)
             if tpl := c.get('template'):
                 tpl = template(tpl, self.hass)
-                rls = tpl.async_render(rdt)
+                try:
+                    rls = tpl.async_render(rdt)
+                except TemplateError:
+                    if c.get('template') != 'micloud_statistics_power_cost':
+                        raise
+                    self.log.warning('Ignoring malformed cloud energy statistics')
+                    continue
             else:
                 rls = [
                     v.get('value')
@@ -1444,9 +1453,14 @@ class Device(CustomConfigHelper):
                 update_attrs_with_suffix(attrs, rls)
         if attrs:
             self.available = True
-            self.props.update(attrs)
             self.data['updated'] = dt.now()
-            self.dispatch(self.decode_attrs(attrs))
+            valid_attrs = filter_power_cost_statistics(attrs)
+            self.props.update(valid_attrs)
+            dispatch_attrs = {
+                key: None if POWER_COST_PATTERN.search(key) and key not in valid_attrs else value
+                for key, value in attrs.items()
+            }
+            self.dispatch(self.decode_attrs(dispatch_attrs))
         return attrs
 
     @cached_property

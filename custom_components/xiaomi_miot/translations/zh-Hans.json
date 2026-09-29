@@ -78,7 +78,7 @@
             },
             "reauth_verify": {
                 "title": "重新授权 - 输入验证码",
-                "description": "点击打开[这个链接]({verify_url})，并发送验证码，并回到此页面输入验证码继续。",
+                "description": "邮箱验证请输入发送到邮箱的验证码。其他验证方式请打开[这个链接]({verify_url})完成验证。",
                 "data": {
                     "verify_ticket": "验证码"
                 }
