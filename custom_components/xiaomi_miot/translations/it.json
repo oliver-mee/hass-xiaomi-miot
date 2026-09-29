@@ -66,7 +66,7 @@
             },
             "reauth_verify": {
                 "title": "Riautenticazione Xiaomi — inserisci il codice di verifica",
-                "description": "Apri [questo link]({verify_url}) nel browser, richiedi un codice, quindi incolla qui il codice di verifica.",
+                "description": "Per la verifica via e-mail, inserisci il codice ricevuto. Per gli altri metodi, apri [questo link]({verify_url}) e completa la verifica.",
                 "data": {
                     "verify_ticket": "Codice di verifica"
                 }

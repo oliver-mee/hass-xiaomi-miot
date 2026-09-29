@@ -75,7 +75,7 @@
             },
             "reauth_verify": {
                 "title": "Xiaomi yeniden kimlik doğrulama — doğrulama kodunu girin",
-                "description": "Tarayıcınızda [bu bağlantıyı]({verify_url}) açın, bir kod isteyin ve ardından doğrulama kodunu buraya yapıştırın.",
+                "description": "E-posta doğrulaması için e-postanıza gönderilen kodu girin. Diğer yöntemler için [bu bağlantıyı]({verify_url}) açıp doğrulamayı tamamlayın.",
                 "data": {
                     "verify_ticket": "Doğrulama kodu"
                 }

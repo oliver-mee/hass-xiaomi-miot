@@ -62,7 +62,6 @@ _LOGGER.addFilter(logger_filter)
 
 ACCOUNT_BASE = 'https://account.xiaomi.com'
 UA = "Android-7.1.1-1.0.0-ONEPLUS A3010-136-%s APP/xiaomi.smarthome APPV/62830"
-
 MANUAL_SCENE_API = 'appgateway/miot/appsceneservice/AppSceneService'
 
 
@@ -390,33 +389,39 @@ class MiotCloud(micloud.MiCloud):
                 return d
         return None
 
+    @staticmethod
+    def _discovery_result(response):
+        if (not isinstance(response, dict)
+                or response.get('code', 0) != 0
+                or not isinstance(response.get('result'), dict)):
+            raise MiCloudException('Xiaomi device discovery returned an invalid response')
+        return response['result']
+
     async def get_device_list(self):
-        rdt = await self.async_request_api('home/device_list', {
+        response = await self.async_request_api('home/device_list', {
             'getVirtualModel': True,
             'getHuamiDevices': 1,
             'get_split_device': False,
             'support_smart_home': True,
-        }, debug=False, timeout=60) or {}
-        result = rdt.get('result')
-        if result:
-            return result['list']
-        _LOGGER.warning('Got xiaomi devices for %s failed: %s', self.username, rdt)
-        return None
+        }, debug=False, timeout=60)
+        devices = self._discovery_result(response).get('list')
+        if not isinstance(devices, list) or any(
+                not isinstance(d, dict) or not d.get('did') for d in devices):
+            raise MiCloudException('Xiaomi device list is invalid')
+        return devices
 
     async def get_all_devices(self, homes=None):
-        devices = {
-            d['did']: d
-            for d in await self.get_device_list() or []
-        }
-        if not isinstance(homes, list):
-            return await self.get_device_list() or []
-        for home in homes:
-            hid = int(home.get('id', 0))
-            uid = int(home.get('uid', 0))
+        devices = {str(d['did']): dict(d) for d in await self.get_device_list()}
+        for home in homes or []:
+            try:
+                hid = int(home['id'])
+                uid = int(home.get('uid') or self.user_id)
+            except (KeyError, TypeError, ValueError) as exc:
+                raise MiCloudException('Xiaomi home identity is invalid') from exc
             start_did = ''
-            has_more = True
-            while has_more:
-                rdt = await self.async_request_api('v2/home/home_device_list', {
+            cursors = set()
+            while True:
+                response = await self.async_request_api('v2/home/home_device_list', {
                     'home_owner': uid,
                     'home_id': hid,
                     'limit': 300,
@@ -425,19 +430,26 @@ class MiotCloud(micloud.MiCloud):
                     'support_smart_home': True,
                     'get_cariot_device': True,
                     'get_third_device': True,
-                }, debug=False, timeout=20) or {}
-                result = rdt.get('result') or {}
-                if not result:
-                    _LOGGER.warning('Got xiaomi devices for %s failed: %s', self.username, rdt)
-                for d in result.get('device_info') or []:
-                    did = d.get('did')
-                    devices.setdefault(did, {}).update(d)
-                start_did = result.get('max_did') or ''
-                has_more = result.get('has_more') and start_did
+                }, debug=False, timeout=20)
+                result = self._discovery_result(response)
+                page = result.get('device_info')
+                if not isinstance(page, list) or any(
+                        not isinstance(d, dict) or not d.get('did') for d in page):
+                    raise MiCloudException('Xiaomi home device list is invalid')
+                for device in page:
+                    devices.setdefault(str(device['did']), {}).update({
+                        **device, 'home_id': str(hid), 'home_name': home.get('name', ''),
+                    })
+                if not result.get('has_more'):
+                    break
+                start_did = result.get('max_did')
+                if not start_did or str(start_did) in cursors:
+                    raise MiCloudException('Xiaomi device pagination did not advance')
+                cursors.add(str(start_did))
         return list(devices.values())
 
     async def get_home_devices(self):
-        rdt = await self.async_request_api('v2/homeroom/gethome_merged', {
+        response = await self.async_request_api('v2/homeroom/gethome_merged', {
             'fg': True,
             'fetch_share': True,
             'fetch_share_dev': True,
@@ -445,20 +457,30 @@ class MiotCloud(micloud.MiCloud):
             'limit': 300,
             'app_ver': 7,
             'plat_form': 0,
-        }, debug=False, timeout=60) or {}
-        result = rdt.get('result') or {}
-        if not result:
-            _LOGGER.warning('Got xiaomi home devices for %s failed: %s', self.username, rdt)
-        devices = result.setdefault('devices', {})
-        for h in result.get('homelist', []):
-            for r in h.get('roomlist', []):
-                for did in r.get('dids', []):
-                    devices[did] = {
-                        'home_id': h.get('id'),
-                        'room_id': r.get('id'),
-                        'home_name': h.get('name'),
-                        'room_name': r.get('name'),
+        }, debug=False, timeout=60)
+        result = dict(self._discovery_result(response))
+        homes = result.get('homelist')
+        if not isinstance(homes, list) or any(not isinstance(h, dict) for h in homes):
+            raise MiCloudException('Xiaomi home list is invalid')
+        devices = {}
+        for home in homes:
+            rooms = home.get('roomlist') or []
+            if not isinstance(rooms, list):
+                raise MiCloudException('Xiaomi room list is invalid')
+            for room in rooms:
+                if not isinstance(room, dict):
+                    raise MiCloudException('Xiaomi room list is invalid')
+                dids = room.get('dids') or []
+                if not isinstance(dids, list):
+                    raise MiCloudException('Xiaomi room devices are invalid')
+                for did in dids:
+                    devices[str(did)] = {
+                        'home_id': str(home.get('id')),
+                        'room_id': room.get('id'),
+                        'home_name': home.get('name'),
+                        'room_name': room.get('name'),
                     }
+        result['devices'] = devices
         return result
 
     async def async_get_devices(self, renew=False, return_all=False):
@@ -467,43 +489,37 @@ class MiotCloud(micloud.MiCloud):
         fnm = f'xiaomi_miot/devices-{self.user_id}-{self.default_server}.json'
         store = Store(self.hass, 1, fnm)
         now = time.time()
-        cds = []
-        dvs = []
         try:
             dat = await store.async_load() or {}
         except ValueError:
             await store.async_remove()
             dat = {}
-        if isinstance(dat, dict):
-            cds = dat.get('devices') or []
-            if not renew and dat.get('update_time', 0) > (now - 86400):
-                dvs = cds
-        if not dvs:
+        if not isinstance(dat, dict):
+            dat = {}
+        cached = dat.get('devices')
+        if not isinstance(cached, list):
+            cached = []
+        fresh = isinstance(dat.get('update_time'), (int, float)) and dat['update_time'] > now - 86400
+        devices = cached
+        if renew or not fresh:
             try:
-                hls = await self.get_home_devices()
-                dvs = await self.get_all_devices(hls.get('homelist', []))
-                if dvs:
-                    if hls:
-                        hds = hls.get('devices') or {}
-                        dvs = [
-                            {**d, **(hds.get(d.get('did')) or {})}
-                            for d in dvs
-                        ]
-                    dat = {
-                        'update_time': now,
-                        'devices': dvs,
-                        'homes': hls.get('homelist', []),
-                    }
-                    await store.async_save(dat)
-                    _LOGGER.info('Got %s devices from xiaomi cloud', len(dvs))
-            except requests.exceptions.ConnectionError as exc:
-                if not cds:
-                    raise exc
-                dvs = cds
-                _LOGGER.warning('Get xiaomi devices filed: %s, use cached %s devices.', exc, len(cds))
-        if return_all:
-            return dat
-        return dvs
+                homes = await self.get_home_devices()
+                devices = await self.get_all_devices(homes['homelist'])
+                if not devices and cached:
+                    raise MiCloudException('Xiaomi returned no devices; retaining cached discovery')
+                home_devices = homes.get('devices') or {}
+                devices = [{**d, **home_devices.get(str(d['did']), {})} for d in devices]
+                dat = {'update_time': now, 'devices': devices, 'homes': homes['homelist']}
+                await store.async_save(dat)
+                _LOGGER.info('Got %s devices from xiaomi cloud', len(devices))
+            except (MiCloudException, requests.exceptions.RequestException,
+                    aiohttp.ClientError, asyncio.TimeoutError, OSError) as exc:
+                if not cached:
+                    raise
+                devices = cached
+                _LOGGER.warning('Xiaomi discovery failed (%s); using %s cached devices',
+                                type(exc).__name__, len(cached))
+        return dat if return_all else devices
 
     async def async_renew_devices(self):
         return await self.async_get_devices(renew=True)
@@ -529,6 +545,9 @@ class MiotCloud(micloud.MiCloud):
                 ex = ft != 'include'
                 fl = filters.get(f'{f}_list') or {}
                 fv = d.get(f)
+                if f == 'home_id':
+                    fv = str(fv)
+                    fl = [str(value) for value in fl]
                 if ex:
                     ok = fv not in fl
                 else:
@@ -775,6 +794,8 @@ class MiotCloud(micloud.MiCloud):
 
         if ntf := auth.get('notificationUrl'):
             ntf = self._absolutize(ntf)
+            for key in ('identity_session', 'identity_options', 'identity_url', 'email_ticket_sent'):
+                self.attrs.pop(key, None)
             self.attrs['verify_url'] = ntf
             raise MiCloudNeedVerify('need_verify').with_url(ntf)
 
@@ -877,6 +898,10 @@ class MiotCloud(micloud.MiCloud):
         return ick
 
     def check_identity_list(self, url, path='fe/service/identity/authStart'):
+        if (self.attrs.get('identity_url') == url
+                and self.attrs.get('identity_session')
+                and self.attrs.get('identity_options')):
+            return self.attrs['identity_options']
         if path not in url:
             return None
         resp = self.account_get(url.replace(path, 'identity/list'), response=True)
@@ -885,9 +910,37 @@ class MiotCloud(micloud.MiCloud):
             raise MiCloudException('Xiaomi identity session missing')
         self.attrs['identity_session'] = identity_session
         data = self.json_decode(resp.text) or {}
+        if not isinstance(data, dict):
+            raise MiCloudException('Xiaomi verification response is invalid')
         flag = data.get('flag', 4)
         options = data.get('options', [flag])
+        if not isinstance(options, list):
+            raise MiCloudException('Xiaomi verification methods are invalid')
+        self.attrs['identity_url'] = url
+        self.attrs['identity_options'] = options
+        self.attrs.pop('email_ticket_sent', None)
         return options or False
+
+    def prepare_email_verification(self):
+        url = self.attrs.get('verify_url')
+        if not url:
+            return False
+        options = self.check_identity_list(url) or []
+        # Only the email endpoint is evidenced. Keep phone/browser flow intact.
+        if options != [8]:
+            return False
+        if self.attrs.get('email_ticket_sent'):
+            return True
+        result = self.account_post(
+            '/identity/auth/sendEmailTicket',
+            params={'_dc': int(time.time() * 1000)},
+            data={'_flag': 8, 'retry': 0, '_json': 'true'},
+            cookies={'identity_session': self.attrs['identity_session']},
+        )
+        if not isinstance(result, dict) or result.get('code') != 0:
+            raise MiCloudException('Xiaomi could not send the verification email')
+        self.attrs['email_ticket_sent'] = True
+        return True
 
     def verify_ticket(self, ticket):
         url = self.attrs.get('verify_url')
@@ -924,7 +977,8 @@ class MiotCloud(micloud.MiCloud):
                 raise MiCloudException('Xiaomi verify response unparseable')
             last = data
             if data.get('code') == 0:
-                self.attrs.pop('identity_session', None)
+                for key in ('identity_session', 'identity_options', 'identity_url', 'email_ticket_sent'):
+                    self.attrs.pop(key, None)
                 return data
         if last and last.get('code') != 0:
             raise MiCloudVerificationError('Xiaomi verification ticket rejected')

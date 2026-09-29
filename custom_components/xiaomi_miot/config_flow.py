@@ -178,9 +178,14 @@ class BaseFlowHandler:
                 errors['base'] = exc.message
                 self.context[exc.message] = True
                 self.context['verify_url'] = exc.url
+                email_sent = False
+                try:
+                    email_sent = await self.hass.async_add_executor_job(mic.prepare_email_verification)
+                except (MiCloudException, requests.exceptions.RequestException):
+                    errors['base'] = 'cannot_reach'
                 self.placeholders.update({
                     'url': exc.url,
-                    'tip': f'[打开验证网页 | Open the verification page]({exc.url})',
+                    'tip': 'Enter the verification code sent to your email.' if email_sent else f'[打开验证网页 | Open the verification page]({exc.url})',
                 })
             elif isinstance(exc, MiCloudAccessDenied) and mic:
                 if url := mic.attrs.pop('captchaImg', None):
@@ -218,7 +223,7 @@ class BaseFlowHandler:
                         homes.setdefault(home_id, d.get('home_name') or 'Default Home')
                         if f in ['did'] and v in user_input.get(f'{f}_list', []):
                             pass
-                        elif home_ids and home_id not in home_ids:
+                        elif home_ids and str(home_id) not in {str(h) for h in home_ids}:
                             continue
                     grp.setdefault(v, 0)
                     grp[v] += 1
@@ -542,9 +547,15 @@ class XiaomiMiotFlowHandler(config_entries.ConfigFlow, BaseFlowHandler, domain=D
         verify_url = candidate.attrs.get('verify_url') if candidate else None
         placeholders = {'verify_url': verify_url or ''}
         if user_input is None:
+            if candidate and isinstance(candidate, MiotCloud):
+                try:
+                    await self.hass.async_add_executor_job(candidate.prepare_email_verification)
+                except (MiCloudException, requests.exceptions.RequestException):
+                    errors['base'] = 'cannot_connect'
             return self._show_reauth_form(
                 'reauth_verify',
                 schema,
+                errors=errors,
                 placeholders=placeholders,
             )
         ticket = (user_input.get('verify_ticket') or '').strip()
