@@ -943,7 +943,7 @@ class Device(CustomConfigHelper):
                 params = data.get('params', [])
                 result = await self.async_set_properties(params)
                 success = True if result else False
-                if err := MiotResults(result).has_error:
+                if err := MiotResults.from_write(result, params).has_error:
                     success = False
                     self.log.warning('Device write error: %s', [payload, data, err])
 
@@ -1339,7 +1339,7 @@ class Device(CustomConfigHelper):
         }
         try:
             results = await self.async_set_properties([pms])
-            result = MiotResults(results).first
+            result = MiotResults.from_write(results, [pms]).first
         except (DeviceException, MiCloudException) as exc:
             self.log.warning('Set miot property %s failed: %s', pms, exc)
             return MiotResult({}, code=-1, error=str(exc))
