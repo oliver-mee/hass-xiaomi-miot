@@ -1,5 +1,9 @@
 {
   "mcpServers": {
+    "home-assistant": {
+      "type": "http",
+      "url": "${HA_MCP_URL}"
+    },
     "miot-spec": {
       "type": "http",
       "url": "https://home.miot-spec.com/mcp"

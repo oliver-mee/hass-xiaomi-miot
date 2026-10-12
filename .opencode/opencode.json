@@ -1,0 +1,23 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "skills": {
+    "paths": ["{env:HOME}/.agents/skills", ".agents/skills"]
+  },
+  "mcp": {
+    "home-assistant": {
+      "type": "remote",
+      "url": "{env:HA_MCP_URL}",
+      "enabled": true
+    },
+    "miot-spec": {
+      "type": "remote",
+      "url": "https://home.miot-spec.com/mcp",
+      "enabled": true
+    },
+    "tools": {
+      "type": "local",
+      "command": ["uv", "run", "scripts/mcp-tools.py"],
+      "enabled": true
+    }
+  }
+}
