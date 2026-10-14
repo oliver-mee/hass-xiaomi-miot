@@ -95,8 +95,12 @@ jobs:
           from importlib.metadata import version
           for package in ("homeassistant", "pytest-homeassistant-custom-component"):
               print(f"{package}: {version(package)}")
+          # HA dev installs its httpx compatibility alias at package import.
+          # Initialise it before pytest plugins (including respx) import httpx.
+          import homeassistant
+          import pytest
+          raise SystemExit(pytest.main(["-q"]))
           PY
-          python3 -m pytest -q
 
   validate-hassfest:
     runs-on: ubuntu-latest
