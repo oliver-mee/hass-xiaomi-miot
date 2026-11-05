@@ -12,7 +12,19 @@ This fork is maintained at [oliver-mee/hass-xiaomi-miot](https://github.com/oliv
 In HACS, add that repository as a custom integration repository and update the
 fork's **Xiaomi Miot** entry. Check the repository owner before downloading;
 installing the community upstream replaces the fork's additional features.
-Use a tagged release, take a full HA backup, install through HACS, then restart HA.
+Take a full HA backup, install through HACS, then restart HA. Select `deploy`
+when intentionally tracking the tested development branch; tagged releases remain
+available for release-based installations. HACS downloads the selected source
+archive, so branch installations do not depend on a release asset.
+
+Version 1.2.2 rebases the fork onto community master `75bc74f6`, including
+connection-mode routing, post-verification login, MAC registry connections,
+energy parsing/precision and device compatibility fixes. Existing generic,
+event, LAN, camera and scene features remain. Energy corrections remain
+accepted and clock-driven resets remain disabled by default. The upstream
+monotonic/reset policy is available only with the per-device customization
+`power_cost_guard: true`; enabling it rejects within-period decreases and
+registers a local-midnight reset. Missing or malformed readings never become zero.
 
 Version 1.2.1 corrects relative-seconds stream expiry and adds a fixture from
 the published C701 spec. Household live playback remains under investigation;
@@ -28,8 +40,8 @@ Email-only verification now requests a code in the same session used to check
 it. Discovery retains cached devices on transient or malformed responses and
 keeps home ownership for shared devices. Energy statistics distinguish missing
 readings from zero and restore scaled values without scaling them twice.
-No synthetic midnight reset or heuristic suppression of genuine decreases is
-applied. The speculative phone-code delivery endpoint is not implemented.
+By default no synthetic midnight reset or heuristic suppression of genuine
+decreases is applied. The speculative phone-code delivery endpoint is not implemented.
 
 Version 1.1.9 separates MiHome message and scene-history sensors by account,
 region and service. Existing registry entries migrate in place so their entity

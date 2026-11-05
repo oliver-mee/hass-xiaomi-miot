@@ -46,9 +46,8 @@ async def test_restore_roundtrip_does_not_scale_twice(make_device, load_miot_spe
 
 @pytest.mark.parametrize('values, expected', [([], None), ([None], None), ([True], None), ([0], 0), ([2.5], 2.5)])
 async def test_template_missing_vs_numeric_zero(hass, values, expected):
-    import json
     result = template('micloud_statistics_power_cost', hass).async_render({
-        'result': [{'time': int(dt.now().timestamp()), 'value': json.dumps(values)}],
+        'result': [{'time': int(dt.now().timestamp()), 'value': values}],
     })
     assert result['power_cost_today'] == expected
     assert result['power_cost_month'] == expected
@@ -80,3 +79,34 @@ async def test_malformed_statistics_json_keeps_energy_state(make_device, load_mi
     await device.update_cloud_statistics([{'key': 'energy', 'template': 'micloud_statistics_power_cost'}])
     assert device.props['power_cost_today'] == 1000
     assert sensor.native_value == 1
+
+
+async def test_default_energy_policy_accepts_device_corrections(make_device, load_miot_spec):
+    from custom_components.xiaomi_miot.core.utils import power_cost_guard_enabled
+    device, _ = energy(make_device, load_miot_spec)
+    now = dt.now()
+    assert power_cost_guard_enabled(device) is False
+    device.props['power_cost_today'] = 1000
+    first = device._filter_power_cost_statistics({'power_cost_today': 1000}, now)
+    device.props.update(first)
+    assert device._filter_power_cost_statistics({'power_cost_today': 500}, now) == {'power_cost_today': 500.0}
+    assert device._filter_power_cost_statistics({'power_cost_today': 0}, now) == {'power_cost_today': 0.0}
+
+
+async def test_default_energy_policy_does_not_register_midnight_reset(make_device, load_miot_spec):
+    from unittest.mock import Mock
+    _, sensor = energy(make_device, load_miot_spec)
+    sensor.entity_id = 'sensor.energy_no_reset'
+    sensor.async_on_remove = Mock()
+    await sensor.async_added_to_hass()
+    sensor.async_on_remove.assert_not_called()
+
+
+async def test_energy_guard_is_explicit_opt_in(make_device, load_miot_spec):
+    from custom_components.xiaomi_miot.core.utils import power_cost_guard_enabled
+    device = make_device(load_miot_spec('test.generic.fallback.json'),
+                         customizes={'power_cost_guard': True})
+    assert power_cost_guard_enabled(device) is True
+    now = dt.now()
+    device.props.update(device._filter_power_cost_statistics({'power_cost_today': 1000}, now))
+    assert device._filter_power_cost_statistics({'power_cost_today': 500}, now) == {}

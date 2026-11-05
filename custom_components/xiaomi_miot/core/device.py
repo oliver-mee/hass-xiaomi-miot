@@ -43,6 +43,7 @@ from .utils import (
     is_offline_exception,
     normalize_power_cost_value,
     power_cost_decreased,
+    power_cost_guard_enabled,
     parse_power_cost_records,
     power_cost_record_dates,
     power_cost_period,
@@ -1542,7 +1543,8 @@ class Device(CustomConfigHelper):
             comparison = round(value * scale, 3) if scale else value
             baseline = round(previous * scale, 3) if scale and previous is not None else previous
             if (
-                periods.get(key) == period
+                power_cost_guard_enabled(self)
+                and periods.get(key) == period
                 and previous is not None
                 and power_cost_decreased(comparison, baseline)
             ):
@@ -1558,7 +1560,7 @@ class Device(CustomConfigHelper):
                 rejections[key] = period
                 result.pop(key)
                 continue
-            if periods.get(key) == period and previous is not None and not scale and value < previous:
+            if power_cost_guard_enabled(self) and periods.get(key) == period and previous is not None and not scale and value < previous:
                 result[key] = self.props[key]
             restore_scales.pop(key, None)
             rejections.pop(key, None)

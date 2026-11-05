@@ -98,6 +98,12 @@ def normalize_power_cost_value(value) -> float | None:
     return value if math.isfinite(value) and value >= 0 else None
 
 
+def power_cost_guard_enabled(device) -> bool:
+    """Keep monotonic estimates and clock resets opt-in for existing installs."""
+    config = getattr(device, 'custom_config_bool', None)
+    return bool(config and config('power_cost_guard', False))
+
+
 def power_cost_decreased(value: float, previous: float) -> bool:
     """Ignore arithmetic roundoff, not measurement-sized decreases."""
     return value < previous and previous - value > 8 * max(

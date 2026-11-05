@@ -44,6 +44,7 @@ from .core.utils import (
     local_zone,
     normalize_power_cost_value,
     power_cost_decreased,
+    power_cost_guard_enabled,
     power_cost_period,
     slugify_object_id,
 )
@@ -245,13 +246,27 @@ class SensorEntity(XEntity, BaseEntity, RestoreEntity):
         return {self.attr: self._attr_native_value}
 
     async def async_added_to_hass(self):
-        await super().async_added_to_hass()
+        self._restoring_power_cost_state = True
+        try:
+            await super().async_added_to_hass()
+        finally:
+            self._restoring_power_cost_state = False
         if not POWER_COST_PATTERN.search(self.attr):
             return
         now = datetime.now(local_zone(self.hass))
         current_period = power_cost_period(self.attr, now)
         self._power_cost_period = current_period
         restored = await self.async_get_last_state()
+        if not restored:
+            # Converter extra data can survive without a recorder state. Restore
+            # only explicitly dated native data, never infer an old period.
+            extra = await self.async_get_last_extra_data()
+            extra = extra.as_dict() if extra else {}
+            if (extra.get('power_cost_period') == current_period
+                    and extra.get('native_unit_of_measurement') == self.native_unit_of_measurement):
+                value = normalize_power_cost_value(extra.get('native_value'))
+                if value is not None:
+                    self._attr_native_value = value
         if restored:
             extra = await self.async_get_last_extra_data()
             extra = extra.as_dict() if extra else {}
@@ -292,6 +307,8 @@ class SensorEntity(XEntity, BaseEntity, RestoreEntity):
                 # Filtering the seed is not a new cloud observation.
                 if seed_legacy and key in attrs:
                     self.device.data.setdefault('_power_cost_restore_scales', {})[key] = ratio
+        if not power_cost_guard_enabled(self.device):
+            return
         self.async_on_remove(
             async_track_time_change(
                 self.hass,
@@ -337,9 +354,15 @@ class SensorEntity(XEntity, BaseEntity, RestoreEntity):
         if prop and prop.value_range:
             if not prop.range_valid(value):
                 value = None
+        if POWER_COST_PATTERN.search(self.attr):
+            value = normalize_power_cost_value(value)
+            if value is None:
+                return
         if value is not None:
             try:
-                if ratio := self.custom_value_ratio:
+                if getattr(self, '_restoring_power_cost_state', False):
+                    pass
+                elif ratio := self.custom_value_ratio:
                     value = round(float(value) * ratio, 3)
                 elif self.state_class:
                     value = round(float(value), 3)
@@ -357,7 +380,8 @@ class SensorEntity(XEntity, BaseEntity, RestoreEntity):
                 value = datetime_with_tzinfo(value)
             previous = getattr(self, '_attr_native_value', None)
             if (
-                period
+                power_cost_guard_enabled(self.device)
+                and period
                 and getattr(self, '_power_cost_period', None) == period
                 and previous is not None
                 and power_cost_decreased(value, previous)

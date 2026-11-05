@@ -27,8 +27,12 @@ from custom_components.xiaomi_miot.sensor import SensorEntity
 
 
 @pytest.fixture(autouse=True)
-def fixed_energy_time(freezer):
+def fixed_energy_time(freezer, monkeypatch):
     """Keep relative day/month records independent of the execution date."""
+    # Exercise upstream's optional monotonic/reset policy explicitly. The fork
+    # keeps measured corrections and no synthetic resets as its default.
+    monkeypatch.setattr('custom_components.xiaomi_miot.core.device.power_cost_guard_enabled', lambda device: True)
+    monkeypatch.setattr('custom_components.xiaomi_miot.sensor.power_cost_guard_enabled', lambda device: True)
     freezer.move_to('2026-09-29T12:00:00+00:00')
 
 

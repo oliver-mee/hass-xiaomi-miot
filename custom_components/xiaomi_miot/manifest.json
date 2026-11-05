@@ -1,8 +1,12 @@
 {
   "domain": "xiaomi_miot",
   "name": "Xiaomi Miot",
-  "after_dependencies": ["homekit"],
-  "codeowners": ["@al-one"],
+  "after_dependencies": [
+    "homekit"
+  ],
+  "codeowners": [
+    "@al-one"
+  ],
   "config_flow": true,
   "dependencies": [
     "http",
@@ -18,5 +22,5 @@
     "python-miio>=0.5.12",
     "micloud>=0.5"
   ],
-  "version": "1.2.1"
+  "version": "1.2.2"
 }
