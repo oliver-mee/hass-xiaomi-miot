@@ -365,11 +365,15 @@ async def test_bad_or_empty_responses_keep_existing_values(hass, response):
 
 @pytest.mark.parametrize('value', ['not-json', '', '[]', '[null]', '[true]',
                                   '["bad"]', '[NaN]', '[Infinity]', '[-1]', '{}'])
-def test_bad_record_does_not_invalidate_other_daily_value(hass, value):
+@pytest.mark.parametrize('invalid_day', [0, -1])
+def test_bad_record_invalidates_only_its_daily_value(hass, value, invalid_day):
     result = template('micloud_statistics_power_cost', hass).async_render({
-        'result': parse_power_cost_records([daily_record(value), daily_record('[1.2]')]),
+        'result': parse_power_cost_records([
+            daily_record(value, days=invalid_day), daily_record('[1.2]'),
+        ]),
     })
-    assert result == {'power_cost_today': 1.2, 'power_cost_month': None}
+    expected_today = None if invalid_day == 0 else 1.2
+    assert result == {'power_cost_today': expected_today, 'power_cost_month': None}
 
 
 async def test_failed_first_command_keeps_second_command_suffix(hass):

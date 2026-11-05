@@ -110,3 +110,15 @@ async def test_energy_guard_is_explicit_opt_in(make_device, load_miot_spec):
     now = dt.now()
     device.props.update(device._filter_power_cost_statistics({'power_cost_today': 1000}, now))
     assert device._filter_power_cost_statistics({'power_cost_today': 500}, now) == {}
+
+
+@pytest.mark.parametrize('invalid_first', [False, True])
+async def test_mixed_valid_invalid_today_withholds_both_totals(hass, invalid_first):
+    timestamp = int(dt.now().timestamp())
+    records = [{'time': timestamp, 'value': [100]},
+               {'time': timestamp, 'value': [None]}]
+    if invalid_first:
+        records.reverse()
+    assert template('micloud_statistics_power_cost', hass).async_render({'result': records}) == {
+        'power_cost_today': None, 'power_cost_month': None,
+    }

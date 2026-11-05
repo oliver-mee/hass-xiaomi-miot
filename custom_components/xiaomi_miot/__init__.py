@@ -602,16 +602,17 @@ async def _handle_device_registry_event(hass: hass_core.HomeAssistant):
             entry_ids = device.config_entries
         if not device or not getattr(device, 'identifiers', None):
             return
-        identifier = next(iter(device.identifiers))
-        if identifier[0] != DOMAIN:
+        miot_identifiers = {item for item in device.identifiers if item[0] == DOMAIN}
+        if not miot_identifiers:
             return
+        identifier = sorted(miot_identifiers)[0]
         miot_device = None
         for entry_id in entry_ids:
             entry = HassEntry.ALL.get(entry_id)
             if not entry:
                 continue
             for d in entry.devices.values():
-                if d.identifiers == device.identifiers:
+                if d.identifiers & miot_identifiers:
                     miot_device = d
                     break
         if action == 'update' and device.name_by_user in ['delete', 'remove', '删除']:
@@ -634,8 +635,8 @@ async def async_remove_config_entry_device(hass: hass_core.HomeAssistant, config
     """Supported from Hass v2022.3"""
     entry = HassEntry.init(hass, config_entry)
     cloud_device = None
-    identifier = next(iter(device.identifiers))
-    if len(identifier) >= 2 and identifier[0] == DOMAIN:
+    identifier = next((item for item in sorted(device.identifiers) if item[0] == DOMAIN), ())
+    if len(identifier) >= 2:
         mac = identifier[1].split('-')[0]
         if mac:
             cloud_device = await entry.get_cloud_device(mac=mac.upper())

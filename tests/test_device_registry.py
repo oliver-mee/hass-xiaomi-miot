@@ -91,15 +91,16 @@ def test_device_info_falls_back_to_parent_identifier(hass):
     assert "via_device_id" not in device_info
 
 
+@pytest.mark.parametrize('linked', [False, True])
 @pytest.mark.parametrize('action', ['disable', 'enable', 'delete'])
 async def test_registry_updates_use_supported_ownership_api(
-    hass, device_registry, monkeypatch, caplog, action,
+    hass, device_registry, monkeypatch, caplog, action, linked,
 ):
     config_entry = MockConfigEntry(domain=DOMAIN)
     config_entry.add_to_hass(hass)
     device = device_registry.async_get_or_create(
         config_entry_id=config_entry.entry_id,
-        identifiers={(DOMAIN, 'test-mac')},
+        identifiers={(DOMAIN, 'test-mac'), ('other', 'shared')} if linked else {(DOMAIN, 'test-mac')},
     )
     if action == 'disable':
         device_registry.async_update_device(device.id, disabled_by=dr.DeviceEntryDisabler.USER)
@@ -107,7 +108,7 @@ async def test_registry_updates_use_supported_ownership_api(
         device_registry.async_update_device(device.id, name_by_user='delete')
     await hass.async_block_till_done()
     miot_device = SimpleNamespace(
-        identifiers=device.identifiers,
+        identifiers={(DOMAIN, 'test-mac')},
         coordinators=[] if action == 'enable' else [object()],
         async_unload=AsyncMock(),
         init_coordinators=AsyncMock(),
