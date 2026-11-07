@@ -1,5 +1,7 @@
 """Support for Xiaomi cameras."""
 import logging
+import asyncio
+import math
 import json
 import time
 import locale
@@ -9,7 +11,7 @@ import re
 import collections
 from os import urandom
 from functools import partial
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 from datetime import datetime, timedelta
 
 from homeassistant.const import STATE_IDLE
@@ -290,6 +292,9 @@ class CameraEntity(XEntity, BaseCameraEntity):
 
     def on_init(self):
         BaseCameraEntity.__init__(self, self.hass)
+        self._live_lock = asyncio.Lock()
+        self._live_url = None
+        self._live_expire = 0
         self._attr_brand = self.device_info.get('manufacturer')
         self._attr_model = self.device_info.get('model')
         # Live HLS via the cloud "camera-stream-for-*" services, as the legacy MiotCameraEntity did;
@@ -335,31 +340,60 @@ class CameraEntity(XEntity, BaseCameraEntity):
     async def async_get_live_url(self):
         if not self._live_start or not self.device.cloud:
             return None
-        now = time.time()
-        if self._live_url and now < self._live_expire:
-            return self._live_url
-        vav = self.custom_config('video_attribute')
-        vav = int(vav) if vav not in (None, '') else None
-        vap = self._live_srv.get_property('video_attribute')
-        if vav is None and vap and vap.value_list:
-            vav = (vap.value_list[0] or {}).get('value')
-        if self._live_stop:
-            await self.async_call_action(self._live_stop, [], cloud=True)
-        result = await self.async_call_action(self._live_start, [] if vav is None else [vav], cloud=True)
-        raw = getattr(result, 'result', None)
-        if not isinstance(raw, dict):
-            raw = result if isinstance(result, dict) else {}
-        odt = self._live_start.out_results(raw.get('out')) or {}
-        url = self._live_addr.from_dict(odt) if self._live_addr else None
-        exp = self._live_exp_prop.from_dict(odt) if self._live_exp_prop else None
-        # Xiaomi returns expiration in ms; without it the URL is known to live ~5 min.
-        self._live_expire = (int(exp) / 1000 - 10) if exp else now + 270
-        self._live_url = url or None
-        if url:
-            self._attr_extra_state_attributes.update({'stream_address': url, 'expire_at': f'{datetime.fromtimestamp(self._live_expire)}'})
-        else:
-            self.log.warning('Live stream address not returned: %s', result)
-        return self._live_url
+        async with self._live_lock:
+            now = time.time()
+            if self._live_url and now < self._live_expire:
+                return self._live_url
+            self._live_url = None
+            self._live_expire = 0
+            vav = self.custom_config('video_attribute')
+            vav = int(vav) if vav not in (None, '') else None
+            vap = self._live_srv.get_property('video_attribute')
+            if vav is None and vap and vap.value_list:
+                vav = (vap.value_list[0] or {}).get('value')
+            if self._live_stop:
+                await self.async_call_action(self._live_stop, [], cloud=True)
+            result = await self.async_call_action(self._live_start, [] if vav is None else [vav], cloud=True)
+            raw = getattr(result, 'result', None)
+            if not isinstance(raw, dict):
+                raw = result if isinstance(result, dict) else {}
+            if type(raw.get('code', 0)) is not int or raw.get('code', 0) != 0:
+                return None
+            output = raw.get('out')
+            if not isinstance(output, list):
+                return None
+            odt = self._live_start.out_results(output) or {}
+            url = self._live_addr.from_dict(odt) if self._live_addr else None
+            # This path feeds ffmpeg, not a WebRTC provider-specific source.
+            if not isinstance(url, str) or any(ord(char) < 33 or ord(char) == 127 or char in '\"\'' for char in url):
+                return None
+            try:
+                parsed = urlsplit(url)
+                if parsed.scheme not in ('http', 'https', 'rtsp', 'rtsps') or not parsed.hostname:
+                    return None
+                parsed.port  # Reject malformed ports without logging the signed URL.
+            except ValueError:
+                return None
+            exp = self._live_exp_prop.from_dict(odt) if self._live_exp_prop else None
+            # Published specs use seconds; some responses contain Unix seconds or ms.
+            expires = now + 270
+            try:
+                value = float(exp) if not isinstance(exp, bool) else 0
+                if math.isfinite(value) and value > 0:
+                    if value >= 1e12:
+                        expires = value / 1000 - 10
+                    elif value >= 1e9:
+                        expires = value - 10
+                    elif value <= 86400:
+                        expires = now + max(0, value - 10)
+            except (TypeError, ValueError, OverflowError):
+                pass
+            if expires <= now:
+                return None
+            self._live_expire = expires
+            self._live_url = url
+            # Signed source URLs stay private, not in entity state attributes.
+            return url
 
     def update_motion_video(self, data: dict):
         tim = data.get('motion_video_time')

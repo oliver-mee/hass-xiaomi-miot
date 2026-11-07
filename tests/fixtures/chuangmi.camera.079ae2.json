@@ -1,0 +1,1951 @@
+{
+  "type": "urn:miot-spec-v2:device:camera:0000A01C:chuangmi-079ae2:1:0000D070",
+  "description": "chuangmi camera 079ae2",
+  "services": [
+    {
+      "iid": 1,
+      "type": "urn:miot-spec-v2:service:device-information:00007801:chuangmi-079ae2:1:0000D070",
+      "description": "Device Information",
+      "properties": [
+        {
+          "iid": 1,
+          "type": "urn:miot-spec-v2:property:manufacturer:00000001:chuangmi-079ae2:1:0000D070",
+          "description": "Device Manufacturer",
+          "format": "string",
+          "access": [
+            "read"
+          ]
+        },
+        {
+          "iid": 2,
+          "type": "urn:miot-spec-v2:property:model:00000002:chuangmi-079ae2:1:0000D070",
+          "description": "Device Model",
+          "format": "string",
+          "access": [
+            "read"
+          ]
+        },
+        {
+          "iid": 3,
+          "type": "urn:miot-spec-v2:property:serial-number:00000003:chuangmi-079ae2:1:0000D070",
+          "description": "Device ID",
+          "format": "string",
+          "access": [
+            "read"
+          ]
+        },
+        {
+          "iid": 4,
+          "type": "urn:miot-spec-v2:property:firmware-revision:00000005:chuangmi-079ae2:1:0000D070",
+          "description": "Current Firmware Version",
+          "format": "string",
+          "access": [
+            "read"
+          ]
+        },
+        {
+          "iid": 5,
+          "type": "urn:miot-spec-v2:property:serial-no:000000FF:chuangmi-079ae2:1:0000D070",
+          "description": "Serial Number",
+          "format": "string",
+          "access": [
+            "read",
+            "notify"
+          ]
+        }
+      ]
+    },
+    {
+      "iid": 2,
+      "type": "urn:miot-spec-v2:service:camera-control:0000782F:chuangmi-079ae2:1:0000D070",
+      "description": "Camera Control",
+      "properties": [
+        {
+          "iid": 1,
+          "type": "urn:miot-spec-v2:property:on:00000006:chuangmi-079ae2:1:0000D070",
+          "description": "Switch Status",
+          "format": "bool",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "source": 1
+        },
+        {
+          "iid": 2,
+          "type": "urn:miot-spec-v2:property:ptz-camera:000001A7:chuangmi-079ae2:1:0000D070",
+          "description": "Ptz Camera",
+          "format": "bool",
+          "access": [
+            "read",
+            "notify"
+          ],
+          "source": 1
+        },
+        {
+          "iid": 3,
+          "type": "urn:miot-spec-v2:property:night-shot:00000057:chuangmi-079ae2:1:0000D070",
+          "description": "Night Shot",
+          "format": "uint8",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "value-list": [
+            {
+              "value": 0,
+              "description": "On"
+            },
+            {
+              "value": 1,
+              "description": "Off"
+            },
+            {
+              "value": 2,
+              "description": "Auto"
+            }
+          ],
+          "source": 1,
+          "gatt-access": []
+        },
+        {
+          "iid": 4,
+          "type": "urn:miot-spec-v2:property:image-rollover:00000058:chuangmi-079ae2:1:0000D070",
+          "description": "Image Rollover",
+          "format": "uint16",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "value-range": [
+            0,
+            180,
+            180
+          ],
+          "source": 1,
+          "gatt-access": []
+        },
+        {
+          "iid": 5,
+          "type": "urn:miot-spec-v2:property:time-watermark:00000087:chuangmi-079ae2:1:0000D070",
+          "description": "Time Watermark",
+          "format": "bool",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "source": 1
+        },
+        {
+          "iid": 7,
+          "type": "urn:miot-spec-v2:property:glimmer-full-color:00000089:chuangmi-079ae2:1:0000D070",
+          "description": "Glimmer Full Color",
+          "format": "bool",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "source": 1
+        },
+        {
+          "iid": 9,
+          "type": "urn:miot-spec-v2:property:human-tracking:000001A8:chuangmi-079ae2:1:0000D070",
+          "description": "Human Tracking",
+          "format": "bool",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "source": 1
+        },
+        {
+          "iid": 11,
+          "type": "urn:miot-spec-v2:property:recording-mode:0000008B:chuangmi-079ae2:1:0000D070",
+          "description": "Recording Mode",
+          "format": "uint8",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "value-list": [
+            {
+              "value": 0,
+              "description": "No Record"
+            },
+            {
+              "value": 1,
+              "description": "Motion Record"
+            },
+            {
+              "value": 2,
+              "description": "All Record"
+            }
+          ],
+          "source": 1
+        },
+        {
+          "iid": 14,
+          "type": "urn:miot-spec-v2:property:image-distortion-correction:0000010F:chuangmi-079ae2:1:0000D070",
+          "description": "image-distortion-correction",
+          "format": "bool",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "source": 1
+        },
+        {
+          "iid": 17,
+          "type": "urn:miot-spec-v2:property:power-frequency:0000036B:chuangmi-079ae2:1:0000D070",
+          "description": "power-frequency",
+          "format": "uint8",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "value-list": [
+            {
+              "value": 1,
+              "description": "50"
+            },
+            {
+              "value": 2,
+              "description": "60"
+            }
+          ],
+          "source": 1,
+          "gatt-access": []
+        }
+      ],
+      "actions": [
+        {
+          "iid": 2,
+          "type": "urn:miot-spec-v2:action:restart-device:00002884:chuangmi-079ae2:1:0000D070",
+          "description": "Restart Device",
+          "in": [],
+          "out": []
+        },
+        {
+          "iid": 1,
+          "type": "urn:miot-spec-v2:action:ptz-calibrate:00002852:chuangmi-079ae2:1:0000D070",
+          "description": "PTZ Calibrate",
+          "in": [],
+          "out": []
+        }
+      ],
+      "events": [
+        {
+          "iid": 1,
+          "type": "urn:miot-spec-v2:event:ir-turned-on:00005058:chuangmi-079ae2:1:0000D070",
+          "description": "Ir Turned On",
+          "arguments": []
+        },
+        {
+          "iid": 2,
+          "type": "urn:miot-spec-v2:event:ir-turned-off:00005059:chuangmi-079ae2:1:0000D070",
+          "description": "Ir Turned Off",
+          "arguments": []
+        }
+      ]
+    },
+    {
+      "iid": 4,
+      "type": "urn:miot-spec-v2:service:memory-card-management:0000784E:chuangmi-079ae2:1:0000D070",
+      "description": "Memory Card Management",
+      "properties": [
+        {
+          "iid": 1,
+          "type": "urn:miot-spec-v2:property:status:00000007:chuangmi-079ae2:1:0000D070",
+          "description": "Status",
+          "format": "uint8",
+          "access": [
+            "read",
+            "notify"
+          ],
+          "value-list": [
+            {
+              "value": 0,
+              "description": "Normal"
+            },
+            {
+              "value": 1,
+              "description": "Non Existent"
+            },
+            {
+              "value": 2,
+              "description": "Full"
+            },
+            {
+              "value": 3,
+              "description": "Broken"
+            },
+            {
+              "value": 4,
+              "description": "Formatting"
+            },
+            {
+              "value": 5,
+              "description": "Ejected"
+            },
+            {
+              "value": 6,
+              "description": "Fixing"
+            },
+            {
+              "value": 7,
+              "description": "Ejecting"
+            },
+            {
+              "value": 8,
+              "description": "Uninitialized"
+            },
+            {
+              "value": 9,
+              "description": "Not Enough Space"
+            },
+            {
+              "value": 10,
+              "description": "File Err"
+            },
+            {
+              "value": 11,
+              "description": "Incompatible"
+            }
+          ],
+          "source": 1,
+          "gatt-access": []
+        },
+        {
+          "iid": 2,
+          "type": "urn:miot-spec-v2:property:storage-total-space:0000008C:chuangmi-079ae2:1:0000D070",
+          "description": "Storage Total Space",
+          "format": "uint32",
+          "access": [
+            "read",
+            "notify"
+          ],
+          "value-range": [
+            0,
+            2147483648,
+            1
+          ],
+          "source": 1,
+          "gatt-access": []
+        },
+        {
+          "iid": 3,
+          "type": "urn:miot-spec-v2:property:storage-free-space:0000008E:chuangmi-079ae2:1:0000D070",
+          "description": "Storage Free Space",
+          "format": "uint32",
+          "access": [
+            "read",
+            "notify"
+          ],
+          "value-range": [
+            0,
+            2147483648,
+            1
+          ],
+          "source": 1,
+          "gatt-access": []
+        },
+        {
+          "iid": 4,
+          "type": "urn:miot-spec-v2:property:storage-used-space:0000008D:chuangmi-079ae2:1:0000D070",
+          "description": "Storage Used Space",
+          "format": "uint32",
+          "access": [
+            "read",
+            "notify"
+          ],
+          "value-range": [
+            0,
+            2147483648,
+            1
+          ],
+          "source": 1,
+          "gatt-access": []
+        },
+        {
+          "iid": 5,
+          "type": "urn:miot-spec-v2:property:dialog-ejected:000002DF:chuangmi-079ae2:1:0000D070",
+          "description": "dialog-ejected",
+          "format": "bool",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "source": 1,
+          "gatt-access": []
+        },
+        {
+          "iid": 6,
+          "type": "urn:miot-spec-v2:property:remaining-recording-duration:0000030C:chuangmi-079ae2:1:0000D070",
+          "description": "remaining-recording-duration",
+          "format": "uint32",
+          "access": [
+            "read",
+            "notify"
+          ],
+          "value-range": [
+            0,
+            2147483648,
+            1
+          ],
+          "source": 1,
+          "gatt-access": []
+        }
+      ],
+      "actions": [
+        {
+          "iid": 1,
+          "type": "urn:miot-spec-v2:action:format:00002831:chuangmi-079ae2:1:0000D070",
+          "description": "Format",
+          "in": [],
+          "out": []
+        },
+        {
+          "iid": 2,
+          "type": "urn:miot-spec-v2:action:pop-up:00002832:chuangmi-079ae2:1:0000D070",
+          "description": "Pop Up",
+          "in": [],
+          "out": []
+        }
+      ]
+    },
+    {
+      "iid": 5,
+      "type": "urn:miot-spec-v2:service:motion-detection:0000784F:chuangmi-079ae2:1:0000D070",
+      "description": "Motion Detection",
+      "properties": [
+        {
+          "iid": 1,
+          "type": "urn:miot-spec-v2:property:motion-detection:00000056:chuangmi-079ae2:1:0000D070",
+          "description": "Motion Detection",
+          "format": "bool",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "source": 1
+        },
+        {
+          "iid": 3,
+          "type": "urn:miot-spec-v2:property:detection-sensitivity:00000090:chuangmi-079ae2:1:0000D070",
+          "description": "Detection Sensitivity",
+          "format": "uint8",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "value-list": [
+            {
+              "value": 0,
+              "description": "Low"
+            },
+            {
+              "value": 1,
+              "description": "Middle"
+            },
+            {
+              "value": 2,
+              "description": "High"
+            }
+          ],
+          "source": 1
+        },
+        {
+          "iid": 4,
+          "type": "urn:miot-spec-v2:property:motion-detection-start-time:00000091:chuangmi-079ae2:1:0000D070",
+          "description": "Motion Detection Start Time",
+          "format": "string",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "source": 1
+        },
+        {
+          "iid": 5,
+          "type": "urn:miot-spec-v2:property:motion-detection-end-time:00000092:chuangmi-079ae2:1:0000D070",
+          "description": "Motion Detection End Time",
+          "format": "string",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "source": 1
+        },
+        {
+          "iid": 2,
+          "type": "urn:miot-spec-v2:property:alarm-interval:0000008F:chuangmi-079ae2:1:0000D070",
+          "description": "alarm-interval",
+          "format": "uint8",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "unit": "minutes",
+          "value-range": [
+            1,
+            30,
+            1
+          ],
+          "source": 1
+        }
+      ]
+    },
+    {
+      "iid": 3,
+      "type": "urn:miot-spec-v2:service:indicator-light:00007803:chuangmi-079ae2:1:0000D070",
+      "description": "Indicator Light",
+      "properties": [
+        {
+          "iid": 1,
+          "type": "urn:miot-spec-v2:property:on:00000006:chuangmi-079ae2:1:0000D070",
+          "description": "Switch Status",
+          "format": "bool",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "source": 1
+        }
+      ]
+    },
+    {
+      "iid": 6,
+      "type": "urn:miot-spec-v2:service:speaker:0000781C:chuangmi-079ae2:1:0000D070",
+      "description": "Speaker",
+      "properties": [
+        {
+          "iid": 1,
+          "type": "urn:miot-spec-v2:property:volume:00000013:chuangmi-079ae2:1:0000D070",
+          "description": "Volume",
+          "format": "uint8",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "unit": "percentage",
+          "value-range": [
+            0,
+            100,
+            1
+          ],
+          "source": 1
+        },
+        {
+          "iid": 2,
+          "type": "urn:miot-spec-v2:property:mute:00000040:chuangmi-079ae2:1:0000D070",
+          "description": "Mute",
+          "format": "bool",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "source": 1
+        }
+      ]
+    },
+    {
+      "iid": 8,
+      "type": "urn:miot-spec-v2:service:ai-detection:000078C8:chuangmi-079ae2:1:0000D070",
+      "description": "Ai Detection",
+      "properties": [
+        {
+          "iid": 5,
+          "type": "urn:miot-spec-v2:property:pet-detection-switch:000001AD:chuangmi-079ae2:1:0000D070",
+          "description": "Pet Detection Switch",
+          "format": "bool",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "source": 1
+        },
+        {
+          "iid": 8,
+          "type": "urn:miot-spec-v2:property:human-detection:000001B0:chuangmi-079ae2:1:0000D070",
+          "description": "Human Detection",
+          "format": "bool",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "source": 1
+        },
+        {
+          "iid": 9,
+          "type": "urn:miot-spec-v2:property:move-detection:000001B1:chuangmi-079ae2:1:0000D070",
+          "description": "Move Detection",
+          "format": "bool",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "source": 1,
+          "gatt-access": []
+        },
+        {
+          "iid": 10,
+          "type": "urn:miot-spec-v2:property:babycry-detection-switch:000001B2:chuangmi-079ae2:1:0000D070",
+          "description": "Babycry Detection Switch",
+          "format": "bool",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "source": 1
+        },
+        {
+          "iid": 21,
+          "type": "urn:miot-spec-v2:property:pet-tracking:000003E4:chuangmi-079ae2:1:0000D070",
+          "description": "pet-tracking",
+          "format": "bool",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "source": 1,
+          "gatt-access": []
+        },
+        {
+          "iid": 24,
+          "type": "urn:miot-spec-v2:property:human-close-up:00000400:chuangmi-079ae2:1:0000D070",
+          "description": "human-close-up",
+          "format": "bool",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "source": 1,
+          "gatt-access": []
+        },
+        {
+          "iid": 27,
+          "type": "urn:miot-spec-v2:property:detection-sensitivity:00000090:chuangmi-079ae2:1:0000D070",
+          "description": "Move Detection Sensitivity",
+          "format": "uint8",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "value-list": [
+            {
+              "value": 0,
+              "description": "low"
+            },
+            {
+              "value": 1,
+              "description": "middle"
+            },
+            {
+              "value": 2,
+              "description": "high"
+            }
+          ],
+          "source": 1,
+          "gatt-access": []
+        },
+        {
+          "iid": 32,
+          "type": "urn:miot-spec-v2:property:abnormal-sound-detection:000004BA:chuangmi-079ae2:1:0000D070",
+          "description": "abnormal-sound-detection",
+          "format": "bool",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "source": 1,
+          "gatt-access": []
+        },
+        {
+          "iid": 31,
+          "type": "urn:miot-spec-v2:property:no-human-time:000004CC:chuangmi-079ae2:1:0000D070",
+          "description": "no-human-time",
+          "format": "uint8",
+          "access": [],
+          "unit": "minutes",
+          "value-range": [
+            0,
+            60,
+            1
+          ],
+          "source": 1,
+          "gatt-access": []
+        },
+        {
+          "iid": 28,
+          "type": "urn:miot-spec-v2:property:detection-sensitivity:00000090:chuangmi-079ae2:1",
+          "description": "Cry Detection Sensitivity",
+          "format": "uint8",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "value-list": [
+            {
+              "value": 0,
+              "description": "Low"
+            },
+            {
+              "value": 1,
+              "description": "Middle"
+            },
+            {
+              "value": 2,
+              "description": "High"
+            }
+          ],
+          "gatt-access": []
+        },
+        {
+          "iid": 29,
+          "type": "urn:miot-spec-v2:property:detection-sensitivity:00000090:chuangmi-079ae2:1",
+          "description": "Abnormal-sound Detection Sensitivity",
+          "format": "uint8",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "value-list": [
+            {
+              "value": 0,
+              "description": "Low"
+            },
+            {
+              "value": 1,
+              "description": "Middle"
+            },
+            {
+              "value": 2,
+              "description": "High"
+            }
+          ],
+          "gatt-access": []
+        }
+      ],
+      "events": [
+        {
+          "iid": 7,
+          "type": "urn:miot-spec-v2:event:detected-babycry-event:0000504D:chuangmi-079ae2:1:0000D070",
+          "description": "Detected Babycry Event",
+          "arguments": []
+        },
+        {
+          "iid": 13,
+          "type": "urn:miot-spec-v2:event:pet-appeared:00005048:chuangmi-079ae2:1:0000D070",
+          "description": "Pet Appeared",
+          "arguments": []
+        },
+        {
+          "iid": 10,
+          "type": "urn:miot-spec-v2:event:object-motion:00005055:chuangmi-079ae2:1:0000D070",
+          "description": "Object Motion",
+          "arguments": []
+        },
+        {
+          "iid": 15,
+          "type": "urn:miot-spec-v2:event:abnormal-sound:000050E2:chuangmi-079ae2:1:0000D070",
+          "description": "abnormal-sound",
+          "arguments": []
+        },
+        {
+          "iid": 14,
+          "type": "urn:miot-spec-v2:event:no-human-appear:000050E4:chuangmi-079ae2:1:0000D070",
+          "description": "",
+          "arguments": [
+            31
+          ]
+        },
+        {
+          "iid": 12,
+          "type": "urn:miot-spec-v2:event:someone-appeared:0000504A:chuangmi-079ae2:1",
+          "description": "Someone Appeared",
+          "arguments": []
+        }
+      ]
+    },
+    {
+      "iid": 10,
+      "type": "urn:miot-spec-v2:service:camera-fav-area:000078C9:chuangmi-079ae2:1:0000D070",
+      "description": "Camera Fav Area",
+      "properties": [
+        {
+          "iid": 1,
+          "type": "urn:miot-spec-v2:property:fav-area:000001BA:chuangmi-079ae2:1:0000D070",
+          "description": "Fav Area",
+          "format": "string",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "source": 1
+        },
+        {
+          "iid": 2,
+          "type": "urn:miot-spec-v2:property:active-fav-area:000001BB:chuangmi-079ae2:1:0000D070",
+          "description": "Active Fav Area",
+          "format": "uint8",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "value-range": [
+            0,
+            64,
+            1
+          ],
+          "source": 1
+        }
+      ],
+      "events": [
+        {
+          "iid": 1,
+          "type": "urn:miot-spec-v2:event:into-fav-area:00005062:chuangmi-079ae2:1:0000D070",
+          "description": "into-fav-area",
+          "arguments": [
+            2
+          ]
+        },
+        {
+          "iid": 2,
+          "type": "urn:miot-spec-v2:event:out-fav-area:00005063:chuangmi-079ae2:1:0000D070",
+          "description": "out-fav-area",
+          "arguments": [
+            2
+          ]
+        }
+      ]
+    },
+    {
+      "iid": 11,
+      "type": "urn:miot-spec-v2:service:cruise:000078CA:chuangmi-079ae2:1:0000D070",
+      "description": "Cruise",
+      "properties": [
+        {
+          "iid": 1,
+          "type": "urn:miot-spec-v2:property:cruise-switch:000001BC:chuangmi-079ae2:1:0000D070",
+          "description": "Cruise Switch",
+          "format": "bool",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "source": 1
+        },
+        {
+          "iid": 2,
+          "type": "urn:miot-spec-v2:property:cruise-cycle:000001BD:chuangmi-079ae2:1:0000D070",
+          "description": "Cruise Cycle",
+          "format": "uint16",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "unit": "minutes",
+          "value-range": [
+            0,
+            1440,
+            1
+          ],
+          "source": 1
+        },
+        {
+          "iid": 3,
+          "type": "urn:miot-spec-v2:property:cruise-start-time:000001BE:chuangmi-079ae2:1:0000D070",
+          "description": "Cruise Start Time",
+          "format": "string",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "source": 1
+        },
+        {
+          "iid": 4,
+          "type": "urn:miot-spec-v2:property:cruise-end-time:000001BF:chuangmi-079ae2:1:0000D070",
+          "description": "Cruise End Time",
+          "format": "string",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "source": 1
+        },
+        {
+          "iid": 5,
+          "type": "urn:miot-spec-v2:property:cruise-repetition:000001C0:chuangmi-079ae2:1:0000D070",
+          "description": "Cruise Repetition",
+          "format": "string",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "source": 1
+        },
+        {
+          "iid": 6,
+          "type": "urn:miot-spec-v2:property:cruise-mode:000001C1:chuangmi-079ae2:1:0000D070",
+          "description": "Cruise Mode",
+          "format": "uint8",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "value-list": [
+            {
+              "value": 0,
+              "description": "Panoramic Cruise"
+            },
+            {
+              "value": 1,
+              "description": "Fixed Point Cruise"
+            }
+          ],
+          "source": 1
+        },
+        {
+          "iid": 7,
+          "type": "urn:miot-spec-v2:property:cruise-position:0000023E:chuangmi-079ae2:1:0000D070",
+          "description": "cruise-position",
+          "format": "string",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "source": 1
+        }
+      ],
+      "events": [
+        {
+          "iid": 1,
+          "type": "urn:miot-spec-v2:event:cruise-started:00005064:chuangmi-079ae2:1:0000D070",
+          "description": "cruise-started",
+          "arguments": []
+        },
+        {
+          "iid": 2,
+          "type": "urn:miot-spec-v2:event:cruise-ended:00005065:chuangmi-079ae2:1:0000D070",
+          "description": "cruise-ended",
+          "arguments": []
+        }
+      ]
+    },
+    {
+      "iid": 14,
+      "type": "urn:miot-spec-v2:service:camera-ipc-cloud:000078CD:chuangmi-079ae2:1:0000D070",
+      "description": "Camera Ipc Cloud",
+      "properties": [
+        {
+          "iid": 1,
+          "type": "urn:miot-spec-v2:property:gop-value:000001C9:chuangmi-079ae2:1:0000D070",
+          "description": "Gop Value",
+          "format": "uint8",
+          "access": [
+            "read",
+            "notify"
+          ],
+          "unit": "seconds",
+          "value-range": [
+            3,
+            10,
+            1
+          ],
+          "source": 1
+        },
+        {
+          "iid": 2,
+          "type": "urn:miot-spec-v2:property:vip-offset-num:000001CA:chuangmi-079ae2:1:0000D070",
+          "description": "Vip Offset Num",
+          "format": "uint16",
+          "access": [
+            "read",
+            "notify"
+          ],
+          "value-range": [
+            1,
+            600,
+            1
+          ],
+          "source": 1
+        },
+        {
+          "iid": 3,
+          "type": "urn:miot-spec-v2:property:non-vip-offset-num:000001CB:chuangmi-079ae2:1:0000D070",
+          "description": "Non Vip Offset Num",
+          "format": "uint8",
+          "access": [
+            "read",
+            "notify"
+          ],
+          "value-range": [
+            1,
+            3,
+            1
+          ],
+          "source": 1
+        }
+      ]
+    },
+    {
+      "iid": 15,
+      "type": "urn:miot-spec-v2:service:virtual-fence:000078F2:chuangmi-079ae2:1:0000D070",
+      "description": "virtual-fence",
+      "properties": [
+        {
+          "iid": 1,
+          "type": "urn:miot-spec-v2:property:virtual-fence-switch:0000031E:chuangmi-079ae2:1:0000D070",
+          "description": "virtual-fence-switch",
+          "format": "bool",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "source": 1
+        },
+        {
+          "iid": 2,
+          "type": "urn:miot-spec-v2:property:virtual-fence-area:0000031F:chuangmi-079ae2:1:0000D070",
+          "description": "virtual-fence-area",
+          "format": "string",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "source": 1
+        },
+        {
+          "iid": 3,
+          "type": "urn:miot-spec-v2:property:people-fence-in:000003E2:chuangmi-079ae2:1:0000D070",
+          "description": "people-fence-in",
+          "format": "bool",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "source": 1
+        },
+        {
+          "iid": 4,
+          "type": "urn:miot-spec-v2:property:people-fence-out:000003E3:chuangmi-079ae2:1:0000D070",
+          "description": "people-fence-out",
+          "format": "bool",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "source": 1
+        },
+        {
+          "iid": 6,
+          "type": "urn:miot-spec-v2:property:area-count:0000049F:chuangmi-079ae2:1:0000D070",
+          "description": "area-count",
+          "format": "uint8",
+          "access": [
+            "read",
+            "notify"
+          ],
+          "value-range": [
+            1,
+            4,
+            1
+          ],
+          "source": 1
+        },
+        {
+          "iid": 7,
+          "type": "urn:miot-spec-v2:property:area-shape:000004A0:chuangmi-079ae2:1:0000D070",
+          "description": "area-shape",
+          "format": "uint8",
+          "access": [
+            "read",
+            "notify"
+          ],
+          "value-list": [
+            {
+              "value": 0,
+              "description": "\u77e9\u5f62"
+            },
+            {
+              "value": 3,
+              "description": "\u4e09\u89d2\u5f62"
+            },
+            {
+              "value": 4,
+              "description": "\u975e\u77e9\u5f62\u56db\u8fb9\u5f62"
+            },
+            {
+              "value": 5,
+              "description": "\u4e94\u8fb9\u5f62"
+            },
+            {
+              "value": 6,
+              "description": "\u516d\u8fb9\u5f62"
+            }
+          ],
+          "source": 1,
+          "gatt-access": []
+        },
+        {
+          "iid": 8,
+          "type": "urn:miot-spec-v2:property:area-support-concave:000004A1:chuangmi-079ae2:1:0000D070",
+          "description": "area-support-concave",
+          "format": "bool",
+          "access": [
+            "read",
+            "notify"
+          ],
+          "source": 1
+        },
+        {
+          "iid": 9,
+          "type": "urn:miot-spec-v2:property:area-display-switch:000004A4:chuangmi-079ae2:1:0000D070",
+          "description": "area-display-switch",
+          "format": "bool",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "source": 1
+        }
+      ],
+      "events": [
+        {
+          "iid": 1,
+          "type": "urn:miot-spec-v2:event:people-fence-in:000050B6:chuangmi-079ae2:1:0000D070",
+          "description": "people-fence-in",
+          "arguments": []
+        },
+        {
+          "iid": 2,
+          "type": "urn:miot-spec-v2:event:people-fence-out:000050B7:chuangmi-079ae2:1:0000D070",
+          "description": "people-fence-out",
+          "arguments": []
+        }
+      ]
+    },
+    {
+      "iid": 19,
+      "type": "urn:miot-spec-v2:service:fire-smoke:0000791E:chuangmi-079ae2:1:0000D070",
+      "description": "fire-smoke",
+      "properties": [
+        {
+          "iid": 1,
+          "type": "urn:miot-spec-v2:property:fire-smoke-switch:00000450:chuangmi-079ae2:1:0000D070",
+          "description": "fire-smoke-switch",
+          "format": "bool",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "source": 1
+        },
+        {
+          "iid": 2,
+          "type": "urn:miot-spec-v2:property:fire-smoke-alarm-switch:00000451:chuangmi-079ae2:1:0000D070",
+          "description": "fire-smoke-alarm-switch",
+          "format": "bool",
+          "access": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "source": 1
+        },
+        {
+          "iid": 3,
+          "type": "urn:miot-spec-v2:property:current-time:00000098:chuangmi-079ae2:1:0000D070",
+          "description": "current-time",
+          "format": "uint32",
+          "access": [],
+          "value-range": [
+            0,
+            4294967295,
+            1
+          ],
+          "source": 1
+        }
+      ],
+      "events": [
+        {
+          "iid": 1,
+          "type": "urn:miot-spec-v2:event:fire-smoke-event:000050D4:chuangmi-079ae2:1:0000D070",
+          "description": "fire-smoke-event",
+          "arguments": []
+        }
+      ]
+    },
+    {
+      "iid": 20,
+      "type": "urn:miot-spec-v2:service:extra-device-information:00007910:chuangmi-079ae2:1:0000D070",
+      "description": "extra-device-information",
+      "properties": [
+        {
+          "iid": 2,
+          "type": "urn:miot-spec-v2:property:qrcode-information:000004CB:chuangmi-079ae2:1",
+          "description": "Qrcode Information",
+          "format": "string",
+          "access": [
+            "read",
+            "notify"
+          ]
+        }
+      ]
+    },
+    {
+      "iid": 29,
+      "type": "urn:miot-spec-v2:service:camera-stream-for-amazon-alexa:00007830:chuangmi-079ae2:1",
+      "description": "Camera Stream Management For Amazon Alexa",
+      "properties": [
+        {
+          "iid": 1,
+          "type": "urn:miot-spec-v2:property:video-codec-type:0000005A:chuangmi-079ae2:1",
+          "description": "Video Codec Type",
+          "format": "uint8",
+          "access": [],
+          "value-list": [
+            {
+              "value": 1,
+              "description": "H264"
+            },
+            {
+              "value": 2,
+              "description": "MPEG"
+            },
+            {
+              "value": 3,
+              "description": "MPEG2"
+            },
+            {
+              "value": 4,
+              "description": "MP4"
+            }
+          ]
+        },
+        {
+          "iid": 2,
+          "type": "urn:miot-spec-v2:property:video-attribute:0000005B:chuangmi-079ae2:1",
+          "description": "Video Attribute",
+          "format": "uint8",
+          "access": [],
+          "value-list": [
+            {
+              "value": 1,
+              "description": "1920_1080_30"
+            },
+            {
+              "value": 2,
+              "description": "1280_720_30"
+            },
+            {
+              "value": 3,
+              "description": "1024_768_30"
+            }
+          ]
+        },
+        {
+          "iid": 3,
+          "type": "urn:miot-spec-v2:property:audio-codec-type:0000005C:chuangmi-079ae2:1",
+          "description": "Audio Codec Type",
+          "format": "uint8",
+          "access": [],
+          "value-list": [
+            {
+              "value": 1,
+              "description": "PCMU"
+            },
+            {
+              "value": 2,
+              "description": "PCMA"
+            },
+            {
+              "value": 3,
+              "description": "OPUS"
+            },
+            {
+              "value": 4,
+              "description": "MSBC"
+            },
+            {
+              "value": 5,
+              "description": "AMR"
+            }
+          ]
+        },
+        {
+          "iid": 4,
+          "type": "urn:miot-spec-v2:property:audio-attribute:0000005D:chuangmi-079ae2:1",
+          "description": "Audio Attribute",
+          "format": "uint8",
+          "access": [],
+          "value-list": [
+            {
+              "value": 0,
+              "description": "Default"
+            },
+            {
+              "value": 1,
+              "description": "44100_2_16_VARIABLE"
+            },
+            {
+              "value": 2,
+              "description": "8000_1_8_CONSTANT"
+            }
+          ]
+        },
+        {
+          "iid": 5,
+          "type": "urn:miot-spec-v2:property:authorization-type:00000062:chuangmi-079ae2:1",
+          "description": "Authorization Type",
+          "format": "uint8",
+          "access": [],
+          "value-list": [
+            {
+              "value": 0,
+              "description": "None"
+            },
+            {
+              "value": 1,
+              "description": "Basic"
+            },
+            {
+              "value": 2,
+              "description": "Digest"
+            }
+          ]
+        },
+        {
+          "iid": 6,
+          "type": "urn:miot-spec-v2:property:stream-address:0000005E:chuangmi-079ae2:1",
+          "description": "Stream URL",
+          "format": "string",
+          "access": []
+        },
+        {
+          "iid": 7,
+          "type": "urn:miot-spec-v2:property:image-snapshot:00000064:chuangmi-079ae2:1",
+          "description": "Image Snapshot URL",
+          "format": "string",
+          "access": []
+        },
+        {
+          "iid": 8,
+          "type": "urn:miot-spec-v2:property:expiration-time:00000063:chuangmi-079ae2:1",
+          "description": "Expiration Time",
+          "format": "uint32",
+          "access": [],
+          "unit": "seconds",
+          "value-range": [
+            0,
+            3600,
+            3600
+          ]
+        },
+        {
+          "iid": 9,
+          "type": "urn:miot-spec-v2:property:stream-status:00000059:chuangmi-079ae2:1",
+          "description": "Stream Status",
+          "format": "uint8",
+          "access": [
+            "read",
+            "notify"
+          ],
+          "value-list": [
+            {
+              "value": 1,
+              "description": "Available"
+            },
+            {
+              "value": 2,
+              "description": "In use"
+            },
+            {
+              "value": 3,
+              "description": "Unavailable"
+            }
+          ]
+        },
+        {
+          "iid": 10,
+          "type": "urn:miot-spec-v2:property:session-id:000001DA:chuangmi-079ae2:1",
+          "description": "Session Id",
+          "format": "string",
+          "access": []
+        },
+        {
+          "iid": 11,
+          "type": "urn:miot-spec-v2:property:webrtc-offer:000001DB:chuangmi-079ae2:1",
+          "description": "Webrtc Offer",
+          "format": "string",
+          "access": []
+        },
+        {
+          "iid": 12,
+          "type": "urn:miot-spec-v2:property:param-sleep-status:000003B2:chuangmi-079ae2:1",
+          "description": "Param Sleep Status",
+          "format": "bool",
+          "access": []
+        },
+        {
+          "iid": 13,
+          "type": "urn:miot-spec-v2:property:camera-index:00000423:chuangmi-079ae2:1",
+          "description": "Camera Index",
+          "format": "uint8",
+          "access": [],
+          "value-range": [
+            0,
+            10,
+            1
+          ]
+        }
+      ],
+      "actions": [
+        {
+          "iid": 1,
+          "type": "urn:miot-spec-v2:action:get-stream-configuration:00002823:chuangmi-079ae2:1",
+          "description": "Get Stream Configuration of Camera",
+          "in": [],
+          "out": [
+            9,
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        {
+          "iid": 2,
+          "type": "urn:miot-spec-v2:action:start-rtsp-stream:00002820:chuangmi-079ae2:1",
+          "description": "Start Camera Stream for Alexa",
+          "in": [
+            2
+          ],
+          "out": [
+            6,
+            7,
+            8
+          ]
+        },
+        {
+          "iid": 3,
+          "type": "urn:miot-spec-v2:action:stop-stream:00002822:chuangmi-079ae2:1",
+          "description": "Stop Camera Stream",
+          "in": [],
+          "out": []
+        }
+      ]
+    },
+    {
+      "iid": 28,
+      "type": "urn:miot-spec-v2:service:camera-stream-for-google-home:00007831:chuangmi-079ae2:1",
+      "description": "Camera Stream Management For Google Home",
+      "properties": [
+        {
+          "iid": 1,
+          "type": "urn:miot-spec-v2:property:video-codec-type:0000005A:chuangmi-079ae2:1",
+          "description": "Video Codec Type",
+          "format": "uint8",
+          "access": [],
+          "value-list": [
+            {
+              "value": 1,
+              "description": "H264"
+            },
+            {
+              "value": 2,
+              "description": "MPEG"
+            },
+            {
+              "value": 3,
+              "description": "MPEG2"
+            },
+            {
+              "value": 4,
+              "description": "MP4"
+            }
+          ]
+        },
+        {
+          "iid": 2,
+          "type": "urn:miot-spec-v2:property:video-attribute:0000005B:chuangmi-079ae2:1",
+          "description": "Video Attribute",
+          "format": "uint8",
+          "access": [],
+          "value-list": [
+            {
+              "value": 1,
+              "description": "1920_1080_30"
+            },
+            {
+              "value": 2,
+              "description": "1280_720_30"
+            },
+            {
+              "value": 3,
+              "description": "1024_768_30"
+            }
+          ]
+        },
+        {
+          "iid": 3,
+          "type": "urn:miot-spec-v2:property:audio-codec-type:0000005C:chuangmi-079ae2:1",
+          "description": "Audio Codec Type",
+          "format": "uint8",
+          "access": [],
+          "value-list": [
+            {
+              "value": 1,
+              "description": "PCMU"
+            },
+            {
+              "value": 2,
+              "description": "PCMA"
+            },
+            {
+              "value": 3,
+              "description": "OPUS"
+            },
+            {
+              "value": 4,
+              "description": "MSBC"
+            },
+            {
+              "value": 5,
+              "description": "AMR"
+            }
+          ]
+        },
+        {
+          "iid": 4,
+          "type": "urn:miot-spec-v2:property:audio-attribute:0000005D:chuangmi-079ae2:1",
+          "description": "Audio Attribute",
+          "format": "uint8",
+          "access": [],
+          "value-list": [
+            {
+              "value": 0,
+              "description": "Default"
+            },
+            {
+              "value": 1,
+              "description": "44100_2_16_VARIABLE"
+            },
+            {
+              "value": 2,
+              "description": "8000_1_8_CONSTANT"
+            }
+          ]
+        },
+        {
+          "iid": 5,
+          "type": "urn:miot-spec-v2:property:stream-address:0000005E:chuangmi-079ae2:1",
+          "description": "Stream URL",
+          "format": "string",
+          "access": []
+        },
+        {
+          "iid": 6,
+          "type": "urn:miot-spec-v2:property:stream-receiver-id:00000060:chuangmi-079ae2:1",
+          "description": "Stream Receiver id",
+          "format": "string",
+          "access": []
+        },
+        {
+          "iid": 7,
+          "type": "urn:miot-spec-v2:property:stream-auth-token:00000061:chuangmi-079ae2:1",
+          "description": "Stream Auth Token",
+          "format": "string",
+          "access": []
+        },
+        {
+          "iid": 8,
+          "type": "urn:miot-spec-v2:property:expiration-time:00000063:chuangmi-079ae2:1",
+          "description": "Expiration Time",
+          "format": "uint32",
+          "access": [],
+          "unit": "seconds",
+          "value-range": [
+            0,
+            3600,
+            3600
+          ]
+        },
+        {
+          "iid": 9,
+          "type": "urn:miot-spec-v2:property:stream-status:00000059:chuangmi-079ae2:1",
+          "description": "Stream Status",
+          "format": "uint8",
+          "access": [
+            "read",
+            "notify"
+          ],
+          "value-list": [
+            {
+              "value": 1,
+              "description": "Available"
+            },
+            {
+              "value": 2,
+              "description": "In use"
+            },
+            {
+              "value": 3,
+              "description": "Unavailable"
+            }
+          ]
+        }
+      ],
+      "actions": [
+        {
+          "iid": 1,
+          "type": "urn:miot-spec-v2:action:get-stream-configuration:00002823:chuangmi-079ae2:1",
+          "description": "Get Stream Configuration of Camera",
+          "in": [],
+          "out": [
+            9,
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        {
+          "iid": 3,
+          "type": "urn:miot-spec-v2:action:start-hls-stream:00002821:chuangmi-079ae2:1",
+          "description": "Start Camera Stream for Google",
+          "in": [
+            2
+          ],
+          "out": [
+            5
+          ]
+        },
+        {
+          "iid": 4,
+          "type": "urn:miot-spec-v2:action:stop-stream:00002822:chuangmi-079ae2:1",
+          "description": "Stop Camera Stream",
+          "in": [],
+          "out": []
+        }
+      ]
+    },
+    {
+      "iid": 9,
+      "type": "urn:miot-spec-v2:service:p2p-stream:00007881:chuangmi-079ae2:1",
+      "description": "PP Stream",
+      "properties": [
+        {
+          "iid": 1,
+          "type": "urn:miot-spec-v2:property:talk-mode:000001A1:chuangmi-079ae2:1",
+          "description": "Talk Mode",
+          "format": "uint8",
+          "access": [
+            "read",
+            "notify"
+          ],
+          "value-list": [
+            {
+              "value": 0,
+              "description": "Two-way"
+            },
+            {
+              "value": 1,
+              "description": "One-way"
+            }
+          ]
+        },
+        {
+          "iid": 2,
+          "type": "urn:miot-spec-v2:property:audio-codec:000001B3:chuangmi-079ae2:1",
+          "description": "Audio Codec",
+          "format": "uint8",
+          "access": [
+            "read",
+            "notify"
+          ],
+          "value-list": [
+            {
+              "value": 0,
+              "description": "G711A"
+            },
+            {
+              "value": 1,
+              "description": "ACC"
+            },
+            {
+              "value": 2,
+              "description": "OPUS"
+            },
+            {
+              "value": 3,
+              "description": "PCM"
+            }
+          ]
+        },
+        {
+          "iid": 3,
+          "type": "urn:miot-spec-v2:property:audio-bit-width:000001AB:chuangmi-079ae2:1",
+          "description": "Audio Bit Width",
+          "format": "uint8",
+          "access": [
+            "read",
+            "notify"
+          ],
+          "value-list": [
+            {
+              "value": 0,
+              "description": "8"
+            },
+            {
+              "value": 1,
+              "description": "16"
+            }
+          ]
+        },
+        {
+          "iid": 4,
+          "type": "urn:miot-spec-v2:property:video-codec:000001AA:chuangmi-079ae2:1",
+          "description": "Video Codec",
+          "format": "uint8",
+          "access": [
+            "read",
+            "notify"
+          ],
+          "value-list": [
+            {
+              "value": 0,
+              "description": "H264"
+            },
+            {
+              "value": 1,
+              "description": "H265"
+            }
+          ]
+        },
+        {
+          "iid": 5,
+          "type": "urn:miot-spec-v2:property:audio-smp-rate:000001B4:chuangmi-079ae2:1",
+          "description": "Audio Smp Rate",
+          "format": "uint8",
+          "access": [
+            "read",
+            "notify"
+          ],
+          "value-list": [
+            {
+              "value": 0,
+              "description": "8"
+            },
+            {
+              "value": 1,
+              "description": "16"
+            },
+            {
+              "value": 2,
+              "description": "32"
+            },
+            {
+              "value": 3,
+              "description": "48"
+            }
+          ]
+        },
+        {
+          "iid": 6,
+          "type": "urn:miot-spec-v2:property:audio-channel:000001B5:chuangmi-079ae2:1",
+          "description": "Audio Channel",
+          "format": "uint8",
+          "access": [
+            "read",
+            "notify"
+          ],
+          "value-list": [
+            {
+              "value": 0,
+              "description": "Single Channel"
+            },
+            {
+              "value": 1,
+              "description": "Dual Channel"
+            }
+          ]
+        },
+        {
+          "iid": 7,
+          "type": "urn:miot-spec-v2:property:talk-codec:000001B6:chuangmi-079ae2:1",
+          "description": "Talk Codec",
+          "format": "uint8",
+          "access": [
+            "read",
+            "notify"
+          ],
+          "value-list": [
+            {
+              "value": 0,
+              "description": "G711A"
+            },
+            {
+              "value": 1,
+              "description": "ACC"
+            },
+            {
+              "value": 2,
+              "description": "OPUS"
+            },
+            {
+              "value": 3,
+              "description": "PCM"
+            }
+          ]
+        },
+        {
+          "iid": 20,
+          "type": "urn:miot-spec-v2:property:distortion-crt-osdx:000001B7:chuangmi-079ae2:1",
+          "description": "Distortion Crt Osd X",
+          "format": "float",
+          "access": [
+            "read",
+            "notify"
+          ],
+          "value-range": [
+            0,
+            1,
+            0.0001
+          ]
+        },
+        {
+          "iid": 21,
+          "type": "urn:miot-spec-v2:property:distortion-crt-osdy:000001B8:chuangmi-079ae2:1",
+          "description": "Distortion Crt Osd Y",
+          "format": "float",
+          "access": [
+            "read",
+            "notify"
+          ],
+          "value-range": [
+            0,
+            1,
+            0.0001
+          ]
+        },
+        {
+          "iid": 10,
+          "type": "urn:miot-spec-v2:property:resolution-types:000001B9:chuangmi-079ae2:1",
+          "description": "Resolution Types",
+          "format": "uint8",
+          "access": [
+            "read",
+            "notify"
+          ],
+          "value-list": [
+            {
+              "value": 1,
+              "description": "480"
+            },
+            {
+              "value": 9,
+              "description": "2160"
+            }
+          ],
+          "gatt-access": []
+        }
+      ],
+      "actions": [
+        {
+          "iid": 1,
+          "type": "urn:miot-spec-v2:action:start-p2p-stream:00002839:chuangmi-079ae2:1",
+          "description": "Start P2P Stream",
+          "in": [],
+          "out": []
+        },
+        {
+          "iid": 2,
+          "type": "urn:miot-spec-v2:action:stop-stream:00002822:chuangmi-079ae2:1",
+          "description": "Stop Camera Stream",
+          "in": [],
+          "out": []
+        }
+      ]
+    },
+    {
+      "iid": 16,
+      "type": "urn:chuangmi-spec:service:family-guard:00007801:chuangmi-079ae2:1",
+      "description": "family-guard",
+      "properties": [
+        {
+          "iid": 1,
+          "type": "urn:chuangmi-spec:property:family-guard-config:00000001:chuangmi-079ae2:1",
+          "description": "",
+          "format": "string",
+          "access": [
+            "read",
+            "notify",
+            "write"
+          ]
+        },
+        {
+          "iid": 3,
+          "type": "urn:chuangmi-spec:property:clock-key:00000002:chuangmi-079ae2:1",
+          "description": "",
+          "format": "string",
+          "access": []
+        }
+      ],
+      "events": [
+        {
+          "iid": 1,
+          "type": "urn:chuangmi-spec:event:long-time-no-human:00005001:chuangmi-079ae2:1",
+          "description": "long-time-no-human",
+          "arguments": [
+            3
+          ]
+        }
+      ]
+    }
+  ]
+}
