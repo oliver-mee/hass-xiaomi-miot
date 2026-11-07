@@ -596,45 +596,61 @@ class XiaoaiConversationSensor(MiCoordinatorEntity, BaseSensorSubEntity):
             'deviceId': aid,
         }
         try:
-            res = await mic.async_request_api(api, data=dat, method='GET', cookies=cks) or {}
-            rdt = res.get('data')
-            if rdt is None:
+            res = await mic.async_request_api(api, data=dat, method='GET', cookies=cks)
+            if not isinstance(res, dict):
                 return {}
+            rdt = res.get('data')
             if isinstance(rdt, (str, bytes, bytearray)):
-                rdt = json.loads(rdt) or {}
+                rdt = json.loads(rdt)
             if not isinstance(rdt, dict):
                 return {}
-        except (TypeError, ValueError, Exception) as exc:
-            rdt = {}
+            mls = rdt.get('records', [])
+            if not isinstance(mls, list) or any(not isinstance(v, dict) for v in mls):
+                return {}
+            msg = mls[0] if mls else {}
+            mls = mls[1:]
+            con = msg.get('query')
+            if con is not None and not isinstance(con, str):
+                return {}
+            tim = msg.get('time')
+            if tim is not None and (isinstance(tim, bool) or not isinstance(tim, (int, float))):
+                return {}
+            timestamp = datetime.fromtimestamp(tim / 1000, local_zone()) if tim else None
+            answers = msg.get('answers', [])
+            if not isinstance(answers, list):
+                return {}
+            ans = []
+            for v in answers:
+                if not isinstance(v, dict):
+                    continue
+                typ = v.get('type', '')
+                if not isinstance(typ, str):
+                    return {}
+                typ = typ.lower()
+                detail = v.get(typ, {})
+                if not isinstance(detail, dict):
+                    return {}
+                v = {k: val for k, val in v.items() if k != 'bitSet'}
+                if typ in v:
+                    v[typ] = {k: val for k, val in detail.items() if k != 'bitSet'}
+                ans.append(v)
+        except Exception as exc:
             _LOGGER.warning(
                 '%s: Got exception while fetch xiaoai conversation: %s',
-                self.name_model, [aid, exc],
+                self.name_model, type(exc).__name__,
             )
-        mls = rdt.get('records') or []
-        msg = mls.pop(0) if mls else {}
+            return {}
         self.conversation = msg
         old = self._attr_native_value
-        if con := msg.get('query'):
+        if con:
             self._state = con
             self._attr_native_value = con
             logger = _LOGGER.info if old != self._attr_native_value else _LOGGER.debug
             logger('%s: New xiaoai conversation: %s', self.name_model, self._attr_native_value)
-        tim = msg.get('time')
-        ans = []
-        for v in msg.get('answers', []):
-            if not isinstance(v, dict):
-                continue
-            typ = v.get('type', '').lower()
-            v.pop('bitSet', None)
-            v.get(typ, {}).pop('bitSet', None)
-            ans.append(v)
         self._state_attrs.update({
             'content': con,
             'answers': ans,
-            'history': [
-                v.get('query')
-                for v in mls
-            ],
-            'timestamp': datetime.fromtimestamp(tim / 1000, local_zone()) if tim else None,
+            'history': [v.get('query') for v in mls],
+            'timestamp': timestamp,
         })
         return msg
